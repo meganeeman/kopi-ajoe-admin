@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Utama - Kopi Ajoe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="css/theme.css">
+</head>
+<body class="bg-zinc-100 text-zinc-800">
+
+    <div class="flex h-screen overflow-hidden">
+
+        <aside class="w-64 bg-black text-white flex flex-col justify-between p-5 shrink-0">
+            <div>
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">KA</div>
+                    <div>
+                        <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
+                        <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                    </div>
+                </div>
+
+                <nav class="space-y-2">
+                    <a href="index.html" class="flex items-center gap-3 px-4 py-3 sidebar-item-active rounded-xl font-bold text-sm">
+                        <span>📊</span> Dashboard Utama
+                    </a>
+                    <a href="stock.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
+                        <span>📦</span> Manajemen Stok
+                    </a>
+                    <a href="report.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
+                        <span>📈</span> Laporan Penjualan
+                    </a>
+                </nav>
+            </div>
+
+            <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
+                <div>
+                    <p id="adminName" class="text-xs font-bold text-white">Admin</p>
+                    <p class="text-[10px] text-zinc-500">Super Admin</p>
+                </div>
+                <button id="logoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto p-8">
+            <header class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-2xl font-extrabold text-zinc-900">Monitoring Operasional Real-time</h2>
+                    <p class="text-xs text-zinc-500 mt-1">Pantau lokasi gerobak aktif dan performa penjualan hari ini.</p>
+                </div>
+                <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-zinc-200 shadow-sm">
+                    <span class="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping"></span>
+                    <span class="text-xs font-bold text-zinc-700">GPS Live Monitoring</span>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Setoran Cash Hari Ini</p>
+                    <h3 id="statTodayCash" class="text-2xl font-extrabold text-zinc-900">Rp 0</h3>
+                    <p class="text-xs text-green-600 font-semibold mt-2">↑ Dari transaksi tunai</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Total Cup Terjual</p>
+                    <h3 id="statTodayCups" class="text-2xl font-extrabold text-zinc-900">0 Cup</h3>
+                    <p class="text-xs text-zinc-500 mt-2">Hari ini</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Gerobak Buka (GPS ON)</p>
+                    <h3 id="statOpenUnits" class="text-2xl font-extrabold text-zinc-900">0 Unit</h3>
+                    <p class="text-xs text-zinc-500 mt-2">Sedang keliling</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Total Sales Registered</p>
+                    <h3 id="statTotalSales" class="text-2xl font-extrabold text-zinc-900">0 Sales</h3>
+                    <p class="text-xs text-zinc-500 mt-2">Terdaftar di database</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-extrabold text-zinc-900 text-sm">Peta Persebaran Gerobak (GPS Live)</h3>
+                        <span class="text-[10px] bg-zinc-100 px-3 py-1 rounded-lg font-bold text-zinc-600">OpenStreetMap</span>
+                    </div>
+                    <div id="map" class="w-full h-[400px] rounded-xl border border-zinc-200"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-extrabold text-zinc-900 text-sm mb-4">Daftar Status Gerobak</h3>
+                        <div id="cartUnitsList" class="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                            <p class="text-xs text-zinc-400 text-center py-8">Memuat data gerobak...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="js/supabase.js"></script>
+    <script>
+        let map;
+        let markers = {};
+
+        function initMap() {
+            map = L.map('map').setView([-0.2292, 100.6308], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        async function checkAuth() {
+            const { data: { session } } = await supabaseAdmin.auth.getSession();
+            if (!session) {
+                window.location.href = 'login.html';
+                return;
+            }
+            document.getElementById('adminName').innerText = session.user.email.split('@')[0];
+        }
+
+        async function fetchDashboardStats() {
+            try {
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                const todayISO = now.toISOString();
+
+                const { data: trans } = await supabaseAdmin
+                    .from('transactions')
+                    .select('total_price, payment_method, total_cups')
+                    .eq('payment_status', 'success')
+                    .gte('created_at', todayISO);
+
+                if (trans) {
+                    const todayCash = trans
+                        .filter(t => t.payment_method === 'CASH')
+                        .reduce((sum, t) => sum + (t.total_price || 0), 0);
+                    const totalCups = trans.reduce((sum, t) => sum + (t.total_cups || 0), 0);
+
+                    document.getElementById('statTodayCash').innerText = `Rp ${todayCash.toLocaleString('id-ID')}`;
+                    document.getElementById('statTodayCups').innerText = `${totalCups} Cup`;
+                }
+
+                const { count: salesCount } = await supabaseAdmin
+                    .from('users')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('role', 'sales');
+
+                document.getElementById('statTotalSales').innerText = `${salesCount || 0} Sales`;
+
+            } catch (err) {
+                console.log('Error fetch stats:', err);
+            }
+        }
+
+        async function fetchCartUnits() {
+            try {
+                const { data: units, error } = await supabaseAdmin
+                    .from('cart_units')
+                    .select(`
+                        id,
+                        unit_name,
+                        vehicle_type,
+                        is_open,
+                        latitude,
+                        longitude,
+                        users ( name )
+                    `);
+
+                if (error) throw error;
+
+                const openCount = (units || []).filter(u => u.is_open).length;
+                document.getElementById('statOpenUnits').innerText = `${openCount} Unit`;
+
+                const listContainer = document.getElementById('cartUnitsList');
+                listContainer.innerHTML = '';
+
+                if (!units || units.length === 0) {
+                    listContainer.innerHTML = `<p class="text-xs text-zinc-400 text-center py-8">Belum ada unit gerobak.</p>`;
+                    return;
+                }
+
+                units.forEach(unit => {
+                    const salesName = unit.users?.name || 'Sales Belum Set';
+                    const isOpen = unit.is_open;
+
+                    const card = document.createElement('div');
+                    card.className = 'p-3 rounded-xl border border-zinc-100 bg-zinc-50 flex items-center justify-between';
+                    card.innerHTML = `
+                        <div>
+                            <p class="text-xs font-extrabold text-zinc-900">${unit.unit_name} (${unit.vehicle_type || 'Sepeda'})</p>
+                            <p class="text-[11px] text-zinc-500 font-medium">${salesName}</p>
+                        </div>
+                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-md ${isOpen ? 'bg-green-100 text-green-700' : 'bg-zinc-200 text-zinc-600'}">
+                            ${isOpen ? '● BUKA' : 'OFFLINE'}
+                        </span>
+                    `;
+                    listContainer.appendChild(card);
+
+                    if (isOpen && unit.latitude && unit.longitude) {
+                        if (markers[unit.id]) {
+                            markers[unit.id].setLatLng([unit.latitude, unit.longitude]);
+                        } else {
+                            const newMarker = L.marker([unit.latitude, unit.longitude])
+                                .addTo(map)
+                                .bindPopup(`<b>${unit.unit_name}</b><br>Sales: ${salesName}`);
+                            markers[unit.id] = newMarker;
+                        }
+                    } else if (markers[unit.id]) {
+                        map.removeLayer(markers[unit.id]);
+                        delete markers[unit.id];
+                    }
+                });
+
+            } catch (err) {
+                console.log('Error fetch cart units:', err);
+            }
+        }
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await supabaseAdmin.auth.signOut();
+            window.location.href = 'login.html';
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            initMap();
+            await fetchDashboardStats();
+            await fetchCartUnits();
+
+            setInterval(() => {
+                fetchCartUnits();
+                fetchDashboardStats();
+            }, 10000);
+        });
+    </script>
+</body>
+</html>

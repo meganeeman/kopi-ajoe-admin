@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan Penjualan - Kopi Ajoe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="css/theme.css">
+</head>
+<body class="bg-zinc-100 text-zinc-800">
+
+    <div class="flex h-screen overflow-hidden">
+
+        <aside class="w-64 bg-black text-white flex flex-col justify-between p-5 shrink-0">
+            <div>
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">KA</div>
+                    <div>
+                        <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
+                        <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                    </div>
+                </div>
+
+                <nav class="space-y-2">
+                    <a href="index.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
+                        <span>📊</span> Dashboard Utama
+                    </a>
+                    <a href="stock.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
+                        <span>📦</span> Manajemen Stok
+                    </a>
+                    <a href="report.html" class="flex items-center gap-3 px-4 py-3 sidebar-item-active rounded-xl font-bold text-sm">
+                        <span>📈</span> Laporan Penjualan
+                    </a>
+                </nav>
+            </div>
+
+            <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
+                <div>
+                    <p id="adminName" class="text-xs font-bold text-white">Admin</p>
+                    <p class="text-[10px] text-zinc-500">Super Admin</p>
+                </div>
+                <button id="logoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto p-8">
+            <header class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-2xl font-extrabold text-zinc-900">Rekap Laporan Penjualan</h2>
+                    <p class="text-xs text-zinc-500 mt-1">Pantau rincian keuangan dan omzet penjualan sales secara berkala.</p>
+                </div>
+
+                <div class="flex items-center gap-2 bg-white p-1 rounded-xl border border-zinc-200 shadow-sm">
+                    <button id="btnDaily" onclick="setFilter('daily')" class="px-4 py-2 text-xs font-bold rounded-lg bg-black text-white transition">Harian</button>
+                    <button id="btnWeekly" onclick="setFilter('weekly')" class="px-4 py-2 text-xs font-bold rounded-lg text-zinc-500 hover:text-black transition">7 Hari</button>
+                    <button id="btnMonthly" onclick="setFilter('monthly')" class="px-4 py-2 text-xs font-bold rounded-lg text-zinc-500 hover:text-black transition">Bulanan</button>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Total Omzet Penjualan</p>
+                    <h3 id="statTotalRevenue" class="text-2xl font-extrabold text-zinc-900">Rp 0</h3>
+                    <p id="periodLabel1" class="text-xs text-zinc-500 mt-2">Periode terpilih</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Total Transaksi Sukses</p>
+                    <h3 id="statTotalCount" class="text-2xl font-extrabold text-zinc-900">0 Transaksi</h3>
+                    <p id="periodLabel2" class="text-xs text-zinc-500 mt-2">Periode terpilih</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Total Cup Terjual</p>
+                    <h3 id="statTotalCups" class="text-2xl font-extrabold text-zinc-900">0 Cup</h3>
+                    <p id="periodLabel3" class="text-xs text-zinc-500 mt-2">Periode terpilih</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="font-extrabold text-zinc-900 text-base">Rincian Riwayat Transaksi</h3>
+                    <span id="reportStatusText" class="text-xs font-semibold text-zinc-500">Menampilkan data harian</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase">
+                                <th class="py-3 px-2">Waktu Transaksi</th>
+                                <th class="py-3 px-2">Nama Sales</th>
+                                <th class="py-3 px-2 text-center">Jumlah Cup</th>
+                                <th class="py-3 px-2">Metode Pembayaran</th>
+                                <th class="py-3 px-2 text-right">Total Transaksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportTable" class="text-xs divide-y divide-zinc-50 font-medium text-zinc-700">
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-zinc-400">Memuat data laporan...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="js/supabase.js"></script>
+    <script>
+        let currentFilter = 'daily';
+
+        async function checkAuth() {
+            const { data: { session } } = await supabaseAdmin.auth.getSession();
+            if (!session) {
+                window.location.href = 'login.html';
+                return;
+            }
+            document.getElementById('adminName').innerText = session.user.email.split('@')[0];
+        }
+
+        function setFilter(type) {
+            currentFilter = type;
+
+            document.getElementById('btnDaily').className = `px-4 py-2 text-xs font-bold rounded-lg transition ${type === 'daily' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
+            document.getElementById('btnWeekly').className = `px-4 py-2 text-xs font-bold rounded-lg transition ${type === 'weekly' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
+            document.getElementById('btnMonthly').className = `px-4 py-2 text-xs font-bold rounded-lg transition ${type === 'monthly' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
+
+            const labels = {
+                daily: 'Menampilkan data hari ini',
+                weekly: 'Menampilkan data 7 hari terakhir',
+                monthly: 'Menampilkan data bulan ini'
+            };
+
+            document.getElementById('reportStatusText').innerText = labels[type];
+            loadReportData();
+        }
+
+        async function loadReportData() {
+            try {
+                const now = new Date();
+                let startDate = new Date();
+
+                if (currentFilter === 'daily') {
+                    startDate.setHours(0, 0, 0, 0);
+                } else if (currentFilter === 'weekly') {
+                    startDate.setDate(now.getDate() - 7);
+                } else if (currentFilter === 'monthly') {
+                    startDate.setDate(1);
+                    startDate.setHours(0, 0, 0, 0);
+                }
+
+                const { data: transactions, error } = await supabaseAdmin
+                    .from('transactions')
+                    .select(`
+                        id,
+                        total_price,
+                        payment_method,
+                        total_cups,
+                        created_at,
+                        users ( name )
+                    `)
+                    .eq('payment_status', 'success')
+                    .gte('created_at', startDate.toISOString())
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const tableBody = document.getElementById('reportTable');
+                tableBody.innerHTML = '';
+
+                if (!transactions || transactions.length === 0) {
+                    document.getElementById('statTotalRevenue').innerText = 'Rp 0';
+                    document.getElementById('statTotalCount').innerText = '0 Transaksi';
+                    document.getElementById('statTotalCups').innerText = '0 Cup';
+
+                    tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-zinc-400">Tidak ada transaksi pada periode ini.</td></tr>`;
+                    return;
+                }
+
+                const totalRev = transactions.reduce((sum, t) => sum + (t.total_price || 0), 0);
+                const totalCups = transactions.reduce((sum, t) => sum + (t.total_cups || 0), 0);
+
+                document.getElementById('statTotalRevenue').innerText = `Rp ${totalRev.toLocaleString('id-ID')}`;
+                document.getElementById('statTotalCount').innerText = `${transactions.length} Transaksi`;
+                document.getElementById('statTotalCups').innerText = `${totalCups} Cup`;
+
+                transactions.forEach(t => {
+                    const salesName = t.users?.name || 'Sales Partner';
+                    const dateStr = new Date(t.created_at).toLocaleString('id-ID');
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
+                        <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
+                        <td class="py-3.5 px-2 text-center font-extrabold text-black">${t.total_cups || 0}</td>
+                        <td class="py-3.5 px-2">
+                            <span class="px-2.5 py-1 rounded-md text-[10px] font-bold ${t.payment_method === 'CASH' ? 'bg-zinc-200 text-zinc-800' : 'bg-blue-100 text-blue-800'}">
+                                ${t.payment_method || 'CASH'}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-2 text-right font-extrabold text-black">Rp ${(t.total_price || 0).toLocaleString('id-ID')}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+
+            } catch (err) {
+                console.log('Error load report data:', err);
+            }
+        }
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await supabaseAdmin.auth.signOut();
+            window.location.href = 'login.html';
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await loadReportData();
+        });
+    </script>
+</body>
+</html>

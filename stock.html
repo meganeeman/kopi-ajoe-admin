@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manajemen Stok - Kopi Ajoe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="css/theme.css">
+</head>
+<body class="bg-zinc-100 text-zinc-800">
+
+    <div class="flex h-screen overflow-hidden">
+
+        <aside class="w-64 bg-black text-white flex flex-col justify-between p-5 shrink-0">
+            <div>
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">KA</div>
+                    <div>
+                        <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
+                        <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                    </div>
+                </div>
+
+                <nav class="space-y-2">
+                    <a href="index.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
+                        <span>📊</span> Dashboard Utama
+                    </a>
+                    <a href="stock.html" class="flex items-center gap-3 px-4 py-3 sidebar-item-active rounded-xl font-bold text-sm">
+                        <span>📦</span> Manajemen Stok
+                    </a>
+                    <a href="report.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
+                        <span>📈</span> Laporan Penjualan
+                    </a>
+                </nav>
+            </div>
+
+            <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
+                <div>
+                    <p id="adminName" class="text-xs font-bold text-white">Admin</p>
+                    <p class="text-[10px] text-zinc-500">Super Admin</p>
+                </div>
+                <button id="logoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto p-8">
+            <header class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-2xl font-extrabold text-zinc-900">Manajemen Stok & Permintaan Cabang</h2>
+                    <p class="text-xs text-zinc-500 mt-1">Kelola masukan stok dari pabrik dan persetujuan request dari sales.</p>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
+                    <h3 class="font-extrabold text-zinc-900 text-sm mb-4">Tambah Stok Pabrik (Gudang)</h3>
+                    <form id="addStockForm" class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Pilih Produk</label>
+                            <select id="productSelect" required class="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black">
+                                <option value="">Memuat produk...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Jumlah Pasokan (Cup)</label>
+                            <input type="number" id="stockQtyInput" min="1" required placeholder="Contoh: 100" class="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black">
+                        </div>
+                        <button type="submit" id="submitStockBtn" class="w-full bg-black text-white font-bold py-2.5 rounded-xl text-xs shadow-md hover:bg-zinc-800 transition">
+                            + TAMBAH STOK GUDANG
+                        </button>
+                    </form>
+                </div>
+
+                <div class="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
+                    <h3 class="font-extrabold text-zinc-900 text-sm mb-4">Ketersediaan Stok Gudang Utama</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase">
+                                    <th class="py-2.5 px-2">Kategori</th>
+                                    <th class="py-2.5 px-2">Nama Produk</th>
+                                    <th class="py-2.5 px-2 text-right">Stok Gudang</th>
+                                </tr>
+                            </thead>
+                            <tbody id="factoryStockTable" class="text-xs divide-y divide-zinc-50 font-medium text-zinc-700">
+                                <tr>
+                                    <td colspan="3" class="py-6 text-center text-zinc-400">Memuat stok gudang...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="font-extrabold text-zinc-900 text-base">Daftar Permintaan Stok Sales (Request Cabang)</h3>
+                    <button onclick="loadPendingRequests()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">↻ Refresh Request</button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase">
+                                <th class="py-3 px-2">Tanggal & Waktu</th>
+                                <th class="py-3 px-2">Nama Sales</th>
+                                <th class="py-3 px-2">Produk Requested</th>
+                                <th class="py-3 px-2 text-center">Jumlah</th>
+                                <th class="py-3 px-2">Status</th>
+                                <th class="py-3 px-2 text-right">Aksi Admin</th>
+                            </tr>
+                        </thead>
+                        <tbody id="requestsTable" class="text-xs divide-y divide-zinc-50 font-medium text-zinc-700">
+                            <tr>
+                                <td colspan="6" class="py-8 text-center text-zinc-400">Memuat permintaan stok...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="js/supabase.js"></script>
+    <script>
+        async function checkAuth() {
+            const { data: { session } } = await supabaseAdmin.auth.getSession();
+            if (!session) {
+                window.location.href = 'login.html';
+                return;
+            }
+            document.getElementById('adminName').innerText = session.user.email.split('@')[0];
+        }
+
+        async function loadProducts() {
+            try {
+                const { data: products, error } = await supabaseAdmin
+                    .from('products')
+                    .select('*')
+                    .order('name');
+
+                if (error) throw error;
+
+                const select = document.getElementById('productSelect');
+                select.innerHTML = '<option value="">-- Pilih Produk --</option>';
+
+                const tableBody = document.getElementById('factoryStockTable');
+                tableBody.innerHTML = '';
+
+                products.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.innerText = `${p.name} (Stok: ${p.stock_quantity || 0})`;
+                    select.appendChild(opt);
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="py-3 px-2 font-bold text-zinc-400">${p.category || 'COFFEE'}</td>
+                        <td class="py-3 px-2 font-bold text-zinc-900">${p.name}</td>
+                        <td class="py-3 px-2 text-right font-extrabold text-black">${p.stock_quantity || 0} Cup</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            } catch (err) {
+                console.log('Error load products:', err);
+            }
+        }
+
+        async function loadPendingRequests() {
+            try {
+                const { data: reqs, error } = await supabaseAdmin
+                    .from('stock_requests')
+                    .select(`
+                        id,
+                        quantity,
+                        status,
+                        product_name,
+                        created_at,
+                        product_id,
+                        sales_id,
+                        users ( name )
+                    `)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const tableBody = document.getElementById('requestsTable');
+                tableBody.innerHTML = '';
+
+                if (!reqs || reqs.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Belum ada request stok dari sales.</td></tr>`;
+                    return;
+                }
+
+                reqs.forEach(r => {
+                    const salesName = r.users?.name || 'Sales Partner';
+                    const dateStr = new Date(r.created_at).toLocaleString('id-ID');
+                    const isPending = r.status === 'pending';
+
+                    let statusBadge = `<span class="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-1 rounded-md text-[10px]">PENDING</span>`;
+                    if (r.status === 'approved') statusBadge = `<span class="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DISETUJUI</span>`;
+                    if (r.status === 'rejected') statusBadge = `<span class="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DITOLAK</span>`;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
+                        <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
+                        <td class="py-3.5 px-2 font-semibold text-zinc-800">${r.product_name}</td>
+                        <td class="py-3.5 px-2 text-center font-extrabold text-black">${r.quantity}</td>
+                        <td class="py-3.5 px-2">${statusBadge}</td>
+                        <td class="py-3.5 px-2 text-right space-x-2">
+                            ${isPending ? `
+                                <button onclick="handleApprove('${r.id}', '${r.product_id}', ${r.quantity})" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-800 transition">ACC</button>
+                                <button onclick="handleReject('${r.id}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition">Tolak</button>
+                            ` : `<span class="text-zinc-400 text-[10px] font-semibold">Selesai</span>`}
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            } catch (err) {
+                console.log('Error load requests:', err);
+            }
+        }
+
+        document.getElementById('addStockForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const productId = document.getElementById('productSelect').value;
+            const qty = parseInt(document.getElementById('stockQtyInput').value);
+
+            if (!productId || !qty) return;
+
+            try {
+                const { data: prod } = await supabaseAdmin.from('products').select('stock_quantity').eq('id', productId).single();
+                const currentQty = prod?.stock_quantity || 0;
+
+                await supabaseAdmin.from('products').update({ stock_quantity: currentQty + qty }).eq('id', productId);
+
+                alert('Stok gudang berhasil ditambahkan!');
+                document.getElementById('stockQtyInput').value = '';
+                await loadProducts();
+            } catch (err) {
+                alert('Gagal menambah stok gudang.');
+            }
+        });
+
+        async function handleApprove(reqId, productId, qty) {
+            if (!confirm('Setujui permintaan stok ini?')) return;
+            try {
+                await supabaseAdmin.from('stock_requests').update({ status: 'approved' }).eq('id', reqId);
+                alert('Permintaan stok berhasil DISETUJUI!');
+                await loadProducts();
+                await loadPendingRequests();
+            } catch (err) {
+                alert('Gagal menyetujui request.');
+            }
+        }
+
+        async function handleReject(reqId) {
+            if (!confirm('Tolak permintaan stok ini?')) return;
+            try {
+                await supabaseAdmin.from('stock_requests').update({ status: 'rejected' }).eq('id', reqId);
+                alert('Permintaan stok DITOLAK!');
+                await loadPendingRequests();
+            } catch (err) {
+                alert('Gagal menolak request.');
+            }
+        }
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await supabaseAdmin.auth.signOut();
+            window.location.href = 'login.html';
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await loadProducts();
+            await loadPendingRequests();
+        });
+    </script>
+</body>
+</html>
