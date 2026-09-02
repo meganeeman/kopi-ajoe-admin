@@ -52,44 +52,33 @@
                 </div>
             </header>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-                <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
-                    <h3 class="font-extrabold text-zinc-900 text-sm mb-4">Tambah Stok Pabrik (Gudang)</h3>
-                    <form id="addStockForm" class="space-y-4">
-                        <div>
-                            <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Pilih Produk</label>
-                            <select id="productSelect" required class="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black">
-                                <option value="">Memuat produk...</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Jumlah Pasokan (Cup)</label>
-                            <input type="number" id="stockQtyInput" min="1" required placeholder="Contoh: 100" class="w-full px-3 py-2.5 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black">
-                        </div>
-                        <button type="submit" id="submitStockBtn" class="w-full bg-black text-white font-bold py-2.5 rounded-xl text-xs shadow-md hover:bg-zinc-800 transition">
-                            + TAMBAH STOK GUDANG
-                        </button>
-                    </form>
+            <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-extrabold text-zinc-900 text-base">Input Stok Masuk Pabrik (Batch Update)</h3>
+                        <p class="text-xs text-zinc-500">Isi jumlah pasokan baru pada produk yang ingin ditambahkan, lalu klik simpan.</p>
+                    </div>
+                    <button id="batchSubmitBtn" onclick="handleBatchUpdateStock()" class="bg-black text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md hover:bg-zinc-800 transition">
+                        + SIMPAN SEMUA PASOKAN
+                    </button>
                 </div>
 
-                <div class="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
-                    <h3 class="font-extrabold text-zinc-900 text-sm mb-4">Ketersediaan Stok Gudang Utama</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase">
-                                    <th class="py-2.5 px-2">Kategori</th>
-                                    <th class="py-2.5 px-2">Nama Produk</th>
-                                    <th class="py-2.5 px-2 text-right">Stok Gudang</th>
-                                </tr>
-                            </thead>
-                            <tbody id="factoryStockTable" class="text-xs divide-y divide-zinc-50 font-medium text-zinc-700">
-                                <tr>
-                                    <td colspan="3" class="py-6 text-center text-zinc-400">Memuat stok gudang...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase">
+                                <th class="py-2.5 px-2">Kategori</th>
+                                <th class="py-2.5 px-2">Nama Produk</th>
+                                <th class="py-2.5 px-2 text-center">Stok Gudang Saat Ini</th>
+                                <th class="py-2.5 px-2 text-right">Tambah Pasokan Baru (Cup)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="factoryStockTable" class="text-xs divide-y divide-zinc-50 font-medium text-zinc-700">
+                            <tr>
+                                <td colspan="4" class="py-6 text-center text-zinc-400">Memuat stok gudang...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -148,30 +137,89 @@
 
                 if (error) throw error;
 
-                const select = document.getElementById('productSelect');
-                select.innerHTML = '<option value="">-- Pilih Produk --</option>';
-
                 const tableBody = document.getElementById('factoryStockTable');
                 tableBody.innerHTML = '';
 
                 products.forEach(p => {
                     const stockQty = Array.isArray(p.inventory) ? (p.inventory[0]?.stock || 0) : (p.inventory?.stock || 0);
 
-                    const opt = document.createElement('option');
-                    opt.value = p.id;
-                    opt.innerText = `${p.name} (Stok: ${stockQty})`;
-                    select.appendChild(opt);
-
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td class="py-3 px-2 font-bold text-zinc-400">${p.category || 'COFFEE'}</td>
                         <td class="py-3 px-2 font-bold text-zinc-900">${p.name}</td>
-                        <td class="py-3 px-2 text-right font-extrabold text-black">${stockQty} Cup</td>
+                        <td class="py-3 px-2 text-center font-extrabold text-black">${stockQty} Cup</td>
+                        <td class="py-3 px-2 text-right">
+                            <input 
+                                type="number" 
+                                min="0" 
+                                placeholder="+0" 
+                                data-product-id="${p.id}"
+                                data-current-stock="${stockQty}"
+                                class="batch-stock-input w-28 px-3 py-1.5 rounded-lg border border-zinc-200 text-xs font-bold text-right focus:outline-none focus:ring-2 focus:ring-black"
+                            >
+                        </td>
                     `;
                     tableBody.appendChild(tr);
                 });
             } catch (err) {
                 console.log('Error load products:', err);
+            }
+        }
+
+        async function handleBatchUpdateStock() {
+            const inputs = document.querySelectorAll('.batch-stock-input');
+            const updates = [];
+
+            inputs.forEach(input => {
+                const val = parseInt(input.value);
+                if (!isNaN(val) && val > 0) {
+                    const productId = input.getAttribute('data-product-id');
+                    const currentStock = parseInt(input.getAttribute('data-current-stock')) || 0;
+                    updates.push({
+                        productId: productId,
+                        addedQty: val,
+                        newTotal: currentStock + val
+                    });
+                }
+            });
+
+            if (updates.length === 0) {
+                alert('Masukkan setidaknya satu pasokan stok pada kolom input!');
+                return;
+            }
+
+            const btn = document.getElementById('batchSubmitBtn');
+            btn.disabled = true;
+            btn.innerText = 'MEMPROSES...';
+
+            try {
+                for (const item of updates) {
+                    const { data: inv } = await supabaseAdmin
+                        .from('inventory')
+                        .select('stock')
+                        .eq('product_id', item.productId)
+                        .maybeSingle();
+
+                    if (inv) {
+                        await supabaseAdmin
+                            .from('inventory')
+                            .update({ stock: item.newTotal })
+                            .eq('product_id', item.productId);
+                    } else {
+                        await supabaseAdmin
+                            .from('inventory')
+                            .insert({ product_id: item.productId, stock: item.addedQty });
+                    }
+                }
+
+                alert(`Berhasil menambahkan stok untuk ${updates.length} produk!`);
+                await loadProducts();
+            } catch (err) {
+                console.error('Error batch update stock:', err);
+                alert('Gagal memperbarui stok: ' + (err.message || 'Terjadi kesalahan'));
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '+ SIMPAN SEMUA PASOKAN';
             }
         }
 
@@ -230,58 +278,6 @@
                 console.log('Error load requests:', err);
             }
         }
-
-        document.getElementById('addStockForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const productId = document.getElementById('productSelect').value;
-            const qty = parseInt(document.getElementById('stockQtyInput').value);
-
-            if (!productId || isNaN(qty) || qty <= 0) {
-                alert('Pilih produk dan isi jumlah pasokan dengan benar!');
-                return;
-            }
-
-            const submitBtn = document.getElementById('submitStockBtn');
-            submitBtn.disabled = true;
-            submitBtn.innerText = 'MEMPROSES...';
-
-            try {
-                const { data: inv, error: fetchErr } = await supabaseAdmin
-                    .from('inventory')
-                    .select('stock')
-                    .eq('product_id', productId)
-                    .maybeSingle();
-
-                if (fetchErr) throw fetchErr;
-
-                if (inv) {
-                    const newQty = (inv.stock || 0) + qty;
-                    const { error: updateErr } = await supabaseAdmin
-                        .from('inventory')
-                        .update({ stock: newQty })
-                        .eq('product_id', productId);
-
-                    if (updateErr) throw updateErr;
-                    alert(`Berhasil! Stok gudang bertambah menjadi ${newQty} Cup.`);
-                } else {
-                    const { error: insertErr } = await supabaseAdmin
-                        .from('inventory')
-                        .insert({ product_id: productId, stock: qty });
-
-                    if (insertErr) throw insertErr;
-                    alert(`Berhasil! Stok gudang awal berhasil dibuat sebanyak ${qty} Cup.`);
-                }
-
-                document.getElementById('stockQtyInput').value = '';
-                await loadProducts();
-            } catch (err) {
-                console.error('Error add stock:', err);
-                alert('Gagal menambah stok gudang: ' + (err.message || 'Terjadi kesalahan'));
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerText = '+ TAMBAH STOK GUDANG';
-            }
-        });
 
         async function handleApprove(reqId, productId, qty) {
             if (!confirm('Setujui permintaan stok ini?')) return;
