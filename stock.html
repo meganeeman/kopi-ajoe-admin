@@ -138,7 +138,12 @@
             try {
                 const { data: products, error } = await supabaseAdmin
                     .from('products')
-                    .select('*')
+                    .select(`
+                        id,
+                        name,
+                        category,
+                        inventory ( stock )
+                    `)
                     .order('name');
 
                 if (error) throw error;
@@ -150,16 +155,18 @@
                 tableBody.innerHTML = '';
 
                 products.forEach(p => {
+                    const stockQty = Array.isArray(p.inventory) ? (p.inventory[0]?.stock || 0) : (p.inventory?.stock || 0);
+
                     const opt = document.createElement('option');
                     opt.value = p.id;
-                    opt.innerText = `${p.name} (Stok: ${p.stock_quantity || 0})`;
+                    opt.innerText = `${p.name} (Stok: ${stockQty})`;
                     select.appendChild(opt);
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td class="py-3 px-2 font-bold text-zinc-400">${p.category || 'COFFEE'}</td>
                         <td class="py-3 px-2 font-bold text-zinc-900">${p.name}</td>
-                        <td class="py-3 px-2 text-right font-extrabold text-black">${p.stock_quantity || 0} Cup</td>
+                        <td class="py-3 px-2 text-right font-extrabold text-black">${stockQty} Cup</td>
                     `;
                     tableBody.appendChild(tr);
                 });
@@ -239,25 +246,32 @@
             submitBtn.innerText = 'MEMPROSES...';
 
             try {
-                const { data: prod, error: fetchErr } = await supabaseAdmin
-                    .from('products')
-                    .select('stock_quantity')
-                    .eq('id', productId)
+                const { data: inv, error: fetchErr } = await supabaseAdmin
+                    .from('inventory')
+                    .select('stock')
+                    .eq('product_id', productId)
                     .maybeSingle();
 
                 if (fetchErr) throw fetchErr;
 
-                const currentQty = prod?.stock_quantity || 0;
-                const newQty = currentQty + qty;
+                if (inv) {
+                    const newQty = (inv.stock || 0) + qty;
+                    const { error: updateErr } = await supabaseAdmin
+                        .from('inventory')
+                        .update({ stock: newQty })
+                        .eq('product_id', productId);
 
-                const { error: updateErr } = await supabaseAdmin
-                    .from('products')
-                    .update({ stock_quantity: newQty })
-                    .eq('id', productId);
+                    if (updateErr) throw updateErr;
+                    alert(`Berhasil! Stok gudang bertambah menjadi ${newQty} Cup.`);
+                } else {
+                    const { error: insertErr } = await supabaseAdmin
+                        .from('inventory')
+                        .insert({ product_id: productId, stock: qty });
 
-                if (updateErr) throw updateErr;
+                    if (insertErr) throw insertErr;
+                    alert(`Berhasil! Stok gudang awal berhasil dibuat sebanyak ${qty} Cup.`);
+                }
 
-                alert(`Berhasil! Stok gudang bertambah menjadi ${newQty} Cup.`);
                 document.getElementById('stockQtyInput').value = '';
                 await loadProducts();
             } catch (err) {
