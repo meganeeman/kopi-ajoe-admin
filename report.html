@@ -158,22 +158,27 @@
                     startDate.setHours(0, 0, 0, 0);
                 }
 
+                // 1. Fetch data transaksi tanpa relasi
                 const { data: transactions, error } = await supabaseAdmin
                     .from('transactions')
-                    .select(`
-                        id,
-                        total_price,
-                        payment_method,
-                        total_cups,
-                        created_at,
-                        items,
-                        users ( name )
-                    `)
+                    .select('id, sales_id, total_price, payment_method, total_cups, created_at, items')
                     .eq('payment_status', 'success')
                     .gte('created_at', startDate.toISOString())
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
+
+                // 2. Fetch data users untuk pemetaan nama sales
+                const { data: usersData } = await supabaseAdmin
+                    .from('users')
+                    .select('id, name');
+
+                const usersMap = {};
+                if (usersData) {
+                    usersData.forEach(u => {
+                        usersMap[u.id] = u.name;
+                    });
+                }
 
                 const tableBody = document.getElementById('reportTable');
                 tableBody.innerHTML = '';
@@ -221,7 +226,7 @@
                     grandTotalCups += rowCups;
                     grandTotalRoti += rowRoti;
 
-                    const salesName = t.users?.name || 'Sales Partner';
+                    const salesName = (t.sales_id && usersMap[t.sales_id]) ? usersMap[t.sales_id] : 'Sales Partner';
                     const dateStr = new Date(t.created_at).toLocaleString('id-ID');
 
                     const tr = document.createElement('tr');
