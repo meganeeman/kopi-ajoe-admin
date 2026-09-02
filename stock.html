@@ -96,7 +96,7 @@
             <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
                 <div class="flex justify-between items-center mb-5">
                     <h3 class="font-extrabold text-zinc-900 text-base">Daftar Permintaan Stok Sales (Request Cabang)</h3>
-                    <button onclick="loadPendingRequests()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">↻ Refresh Request</button>
+                    <button onclick="loadPendingRequests()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">🔄 Refresh Request</button>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -229,42 +229,78 @@
             const productId = document.getElementById('productSelect').value;
             const qty = parseInt(document.getElementById('stockQtyInput').value);
 
-            if (!productId || !qty) return;
+            if (!productId || isNaN(qty) || qty <= 0) {
+                alert('Pilih produk dan isi jumlah pasokan dengan benar!');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitStockBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'MEMPROSES...';
 
             try {
-                const { data: prod } = await supabaseAdmin.from('products').select('stock_quantity').eq('id', productId).single();
+                const { data: prod, error: fetchErr } = await supabaseAdmin
+                    .from('products')
+                    .select('stock_quantity')
+                    .eq('id', productId)
+                    .maybeSingle();
+
+                if (fetchErr) throw fetchErr;
+
                 const currentQty = prod?.stock_quantity || 0;
+                const newQty = currentQty + qty;
 
-                await supabaseAdmin.from('products').update({ stock_quantity: currentQty + qty }).eq('id', productId);
+                const { error: updateErr } = await supabaseAdmin
+                    .from('products')
+                    .update({ stock_quantity: newQty })
+                    .eq('id', productId);
 
-                alert('Stok gudang berhasil ditambahkan!');
+                if (updateErr) throw updateErr;
+
+                alert(`Berhasil! Stok gudang bertambah menjadi ${newQty} Cup.`);
                 document.getElementById('stockQtyInput').value = '';
                 await loadProducts();
             } catch (err) {
-                alert('Gagal menambah stok gudang.');
+                console.error('Error add stock:', err);
+                alert('Gagal menambah stok gudang: ' + (err.message || 'Terjadi kesalahan'));
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = '+ TAMBAH STOK GUDANG';
             }
         });
 
         async function handleApprove(reqId, productId, qty) {
             if (!confirm('Setujui permintaan stok ini?')) return;
             try {
-                await supabaseAdmin.from('stock_requests').update({ status: 'approved' }).eq('id', reqId);
+                const { error } = await supabaseAdmin
+                    .from('stock_requests')
+                    .update({ status: 'approved' })
+                    .eq('id', reqId);
+
+                if (error) throw error;
+
                 alert('Permintaan stok berhasil DISETUJUI!');
                 await loadProducts();
                 await loadPendingRequests();
             } catch (err) {
-                alert('Gagal menyetujui request.');
+                alert('Gagal menyetujui request: ' + (err.message || 'Error server'));
             }
         }
 
         async function handleReject(reqId) {
             if (!confirm('Tolak permintaan stok ini?')) return;
             try {
-                await supabaseAdmin.from('stock_requests').update({ status: 'rejected' }).eq('id', reqId);
+                const { error } = await supabaseAdmin
+                    .from('stock_requests')
+                    .update({ status: 'rejected' })
+                    .eq('id', reqId);
+
+                if (error) throw error;
+
                 alert('Permintaan stok DITOLAK!');
                 await loadPendingRequests();
             } catch (err) {
-                alert('Gagal menolak request.');
+                alert('Gagal menolak request: ' + (err.message || 'Error server'));
             }
         }
 
