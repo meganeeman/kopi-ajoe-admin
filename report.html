@@ -167,7 +167,7 @@
                         total_cups,
                         created_at,
                         items,
-                        users:sales_id ( name )
+                        users ( name )
                     `)
                     .eq('payment_status', 'success')
                     .gte('created_at', startDate.toISOString())
@@ -198,10 +198,15 @@
                     let rowCups = 0;
                     let rowRoti = 0;
 
-                    if (Array.isArray(t.items) && t.items.length > 0) {
-                        t.items.forEach(item => {
-                            const cat = (item.category || '').toLowerCase();
-                            const qty = item.quantity || item.qty || 0;
+                    let parsedItems = t.items;
+                    if (typeof parsedItems === 'string') {
+                        try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
+                    }
+
+                    if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+                        parsedItems.forEach(item => {
+                            const cat = (item.category || item.name || '').toLowerCase();
+                            const qty = parseInt(item.quantity || item.qty || 1);
 
                             if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
                                 rowRoti += qty;
@@ -241,7 +246,9 @@
                 document.getElementById('statTotalRoti').innerText = `${grandTotalRoti} Pcs`;
 
             } catch (err) {
-                console.log('Error load report data:', err);
+                console.error('Error load report data:', err);
+                const tableBody = document.getElementById('reportTable');
+                tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-500 font-semibold">Gagal memuat data: ${err.message || 'Terjadi kesalahan query'}</td></tr>`;
             }
         }
 
