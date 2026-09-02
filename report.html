@@ -374,6 +374,10 @@
                 return;
             }
 
+            let grandTotalCups = 0;
+            let grandTotalRoti = 0;
+            let grandTotalRevenue = 0;
+
             const exportRows = filteredData.map(t => {
                 const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
                 let rowCups = 0;
@@ -398,6 +402,11 @@
                     rowCups = t.total_cups || 0;
                 }
 
+                const price = t.total_price || 0;
+                grandTotalCups += rowCups;
+                grandTotalRoti += rowRoti;
+                grandTotalRevenue += price;
+
                 return {
                     'Waktu Transaksi': new Date(t.created_at).toLocaleString('id-ID'),
                     'Cabang': getBranchLabel(t.branch || (salesObj ? salesObj.branch : 'PYK')),
@@ -405,8 +414,19 @@
                     'Jumlah Cup': rowCups,
                     'Jumlah Roti': rowRoti,
                     'Metode Pembayaran': t.payment_method || 'CASH',
-                    'Total Transaksi (Rp)': t.total_price || 0
+                    'Total Transaksi (Rp)': price
                 };
+            });
+
+            // Tambahkan baris total di paling bawah
+            exportRows.push({
+                'Waktu Transaksi': 'TOTAL KESELURUHAN',
+                'Cabang': '',
+                'Nama Sales': `${filteredData.length} Transaksi`,
+                'Jumlah Cup': grandTotalCups,
+                'Jumlah Roti': grandTotalRoti,
+                'Metode Pembayaran': '',
+                'Total Transaksi (Rp)': grandTotalRevenue
             });
 
             const worksheet = XLSX.utils.json_to_sheet(exportRows);
@@ -429,6 +449,10 @@
             doc.text('Laporan Penjualan Kopi Ajoe', 14, 15);
             doc.setFontSize(10);
             doc.text(`Periode: ${currentFilter.toUpperCase()} | Dicetak: ${new Date().toLocaleString('id-ID')}`, 14, 22);
+
+            let grandTotalCups = 0;
+            let grandTotalRoti = 0;
+            let grandTotalRevenue = 0;
 
             const tableRows = filteredData.map(t => {
                 const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
@@ -454,6 +478,11 @@
                     rowCups = t.total_cups || 0;
                 }
 
+                const price = t.total_price || 0;
+                grandTotalCups += rowCups;
+                grandTotalRoti += rowRoti;
+                grandTotalRevenue += price;
+
                 return [
                     new Date(t.created_at).toLocaleString('id-ID'),
                     getBranchLabel(t.branch || (salesObj ? salesObj.branch : 'PYK')),
@@ -461,16 +490,29 @@
                     `${rowCups} Cup`,
                     `${rowRoti} Pcs`,
                     t.payment_method || 'CASH',
-                    `Rp ${(t.total_price || 0).toLocaleString('id-ID')}`
+                    `Rp ${price.toLocaleString('id-ID')}`
                 ];
             });
+
+            // Footer total untuk PDF
+            const footRow = [
+                'TOTAL',
+                '',
+                `${filteredData.length} Transaksi`,
+                `${grandTotalCups} Cup`,
+                `${grandTotalRoti} Pcs`,
+                '',
+                `Rp ${grandTotalRevenue.toLocaleString('id-ID')}`
+            ];
 
             doc.autoTable({
                 head: [['Waktu', 'Cabang', 'Nama Sales', 'Jumlah Cup', 'Jumlah Roti', 'Metode', 'Total Transaksi']],
                 body: tableRows,
+                foot: [footRow],
                 startY: 28,
                 theme: 'striped',
-                headStyles: { fillColor: [0, 0, 0] }
+                headStyles: { fillColor: [0, 0, 0] },
+                footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
             });
 
             doc.save(`Laporan_Penjualan_Kopi_Ajoe_${currentFilter}.pdf`);
