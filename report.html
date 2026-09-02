@@ -6,6 +6,9 @@
     <title>Laporan Penjualan - Kopi Ajoe Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="css/theme.css">
 </head>
 <body class="bg-zinc-100 text-zinc-800">
@@ -38,7 +41,7 @@
             <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
                 <div>
                     <p id="adminName" class="text-xs font-bold text-white">Admin</p>
-                    <p class="text-[10px] text-zinc-500">Super Admin</p>
+                    <p id="adminRole" class="text-[10px] text-zinc-500">Super Admin</p>
                 </div>
                 <button id="logoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
             </div>
@@ -51,10 +54,19 @@
                     <p class="text-xs text-zinc-500 mt-1">Pantau rincian keuangan dan omzet penjualan sales secara berkala.</p>
                 </div>
 
-                <div class="flex items-center gap-2 bg-white p-1 rounded-xl border border-zinc-200 shadow-sm">
-                    <button id="btnDaily" onclick="setFilter('daily')" class="px-4 py-2 text-xs font-bold rounded-lg bg-black text-white transition">Harian</button>
-                    <button id="btnWeekly" onclick="setFilter('weekly')" class="px-4 py-2 text-xs font-bold rounded-lg text-zinc-500 hover:text-black transition">7 Hari</button>
-                    <button id="btnMonthly" onclick="setFilter('monthly')" class="px-4 py-2 text-xs font-bold rounded-lg text-zinc-500 hover:text-black transition">Bulanan</button>
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex items-center gap-1 bg-white p-1 rounded-xl border border-zinc-200 shadow-sm">
+                        <button id="btnDaily" onclick="setFilter('daily')" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-black text-white transition">Harian</button>
+                        <button id="btnWeekly" onclick="setFilter('weekly')" class="px-3 py-1.5 text-xs font-bold rounded-lg text-zinc-500 hover:text-black transition">7 Hari</button>
+                        <button id="btnMonthly" onclick="setFilter('monthly')" class="px-3 py-1.5 text-xs font-bold rounded-lg text-zinc-500 hover:text-black transition">Bulanan</button>
+                    </div>
+
+                    <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                        <span>📊</span> Excel
+                    </button>
+                    <button onclick="exportToPDF()" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                        <span>📄</span> PDF
+                    </button>
                 </div>
             </header>
 
@@ -92,24 +104,34 @@
                     </div>
 
                     <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <select id="branchSelectFilter" onchange="renderReportTable()" class="w-full sm:w-auto px-3 py-2 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black">
+                            <option value="">-- Semua Cabang --</option>
+                            <option value="PYK">Payakumbuh (PYK)</option>
+                            <option value="BKT">Bukittinggi (BKT)</option>
+                            <option value="SOL">Solok (SOL)</option>
+                            <option value="PDG">Padang (PDG)</option>
+                        </select>
+
                         <select id="salesSelectFilter" onchange="renderReportTable()" class="w-full sm:w-auto px-3 py-2 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black">
                             <option value="">-- Semua Sales --</option>
                         </select>
+
                         <input 
                             type="text" 
                             id="searchSalesInput" 
                             oninput="renderReportTable()" 
                             placeholder="Cari nama sales..." 
-                            class="w-full sm:w-64 px-3 py-2 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black"
+                            class="w-full sm:w-48 px-3 py-2 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black"
                         >
                     </div>
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
+                    <table class="w-full text-left border-collapse" id="mainReportTable">
                         <thead>
                             <tr class="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase">
                                 <th class="py-3 px-2">Waktu Transaksi</th>
+                                <th class="py-3 px-2">Cabang</th>
                                 <th class="py-3 px-2">Nama Sales</th>
                                 <th class="py-3 px-2 text-center">Jumlah Cup</th>
                                 <th class="py-3 px-2 text-center">Jumlah Roti</th>
@@ -119,7 +141,7 @@
                         </thead>
                         <tbody id="reportTable" class="text-xs divide-y divide-zinc-50 font-medium text-zinc-700">
                             <tr>
-                                <td colspan="6" class="py-8 text-center text-zinc-400">Memuat data laporan...</td>
+                                <td colspan="7" class="py-8 text-center text-zinc-400">Memuat data laporan...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -134,6 +156,20 @@
         let currentFilter = 'daily';
         let rawTransactionsData = [];
         let usersMap = {};
+        let currentUserBranch = 'ALL';
+        let currentUserRole = 'super_admin';
+
+        const BRANCH_NAMES = {
+            'ALL': 'Semua Cabang',
+            'PYK': 'Payakumbuh',
+            'BKT': 'Bukittinggi',
+            'SOL': 'Solok',
+            'PDG': 'Padang'
+        };
+
+        function getBranchLabel(code) {
+            return BRANCH_NAMES[code] || code || 'Cabang';
+        }
 
         async function checkAuth() {
             const { data: { session } } = await supabaseAdmin.auth.getSession();
@@ -142,14 +178,32 @@
                 return;
             }
             document.getElementById('adminName').innerText = session.user.email.split('@')[0];
+
+            const { data: userData } = await supabaseAdmin
+                .from('users')
+                .select('role, branch')
+                .eq('email', session.user.email)
+                .maybeSingle();
+
+            if (userData) {
+                currentUserRole = userData.role || 'super_admin';
+                currentUserBranch = userData.branch || 'ALL';
+                document.getElementById('adminRole').innerText = currentUserRole.toUpperCase();
+
+                if (currentUserRole !== 'super_admin' && currentUserBranch !== 'ALL') {
+                    const branchSelect = document.getElementById('branchSelectFilter');
+                    branchSelect.value = currentUserBranch;
+                    branchSelect.disabled = true;
+                }
+            }
         }
 
         function setFilter(type) {
             currentFilter = type;
 
-            document.getElementById('btnDaily').className = `px-4 py-2 text-xs font-bold rounded-lg transition ${type === 'daily' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
-            document.getElementById('btnWeekly').className = `px-4 py-2 text-xs font-bold rounded-lg transition ${type === 'weekly' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
-            document.getElementById('btnMonthly').className = `px-4 py-2 text-xs font-bold rounded-lg transition ${type === 'monthly' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
+            document.getElementById('btnDaily').className = `px-3 py-1.5 text-xs font-bold rounded-lg transition ${type === 'daily' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
+            document.getElementById('btnWeekly').className = `px-3 py-1.5 text-xs font-bold rounded-lg transition ${type === 'weekly' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
+            document.getElementById('btnMonthly').className = `px-3 py-1.5 text-xs font-bold rounded-lg transition ${type === 'monthly' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
 
             const labels = {
                 daily: 'Menampilkan data hari ini',
@@ -175,19 +229,24 @@
                     startDate.setHours(0, 0, 0, 0);
                 }
 
-                const { data: transactions, error } = await supabaseAdmin
+                let query = supabaseAdmin
                     .from('transactions')
-                    .select('id, sales_id, total_price, payment_method, total_cups, created_at, items')
+                    .select('id, sales_id, total_price, payment_method, total_cups, created_at, items, branch')
                     .eq('payment_status', 'success')
                     .gte('created_at', startDate.toISOString())
                     .order('created_at', { ascending: false });
 
+                if (currentUserRole !== 'super_admin' && currentUserBranch !== 'ALL') {
+                    query = query.eq('branch', currentUserBranch);
+                }
+
+                const { data: transactions, error } = await query;
                 if (error) throw error;
                 rawTransactionsData = transactions || [];
 
                 const { data: usersData } = await supabaseAdmin
                     .from('users')
-                    .select('id, name');
+                    .select('id, name, branch');
 
                 usersMap = {};
                 const salesSelect = document.getElementById('salesSelectFilter');
@@ -195,7 +254,7 @@
 
                 if (usersData) {
                     usersData.forEach(u => {
-                        usersMap[u.id] = u.name;
+                        usersMap[u.id] = { name: u.name, branch: u.branch };
                         const opt = document.createElement('option');
                         opt.value = u.id;
                         opt.innerText = u.name;
@@ -208,25 +267,33 @@
             } catch (err) {
                 console.error('Error load report data:', err);
                 const tableBody = document.getElementById('reportTable');
-                tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-500 font-semibold">Gagal memuat data: ${err.message || 'Terjadi kesalahan query'}</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-red-500 font-semibold">Gagal memuat data: ${err.message || 'Terjadi kesalahan query'}</td></tr>`;
             }
+        }
+
+        function getFilteredTransactions() {
+            const selectedBranch = document.getElementById('branchSelectFilter').value;
+            const selectedSalesId = document.getElementById('salesSelectFilter').value;
+            const searchKeyword = document.getElementById('searchSalesInput').value.toLowerCase().trim();
+
+            return rawTransactionsData.filter(t => {
+                const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
+                const salesName = salesObj ? salesObj.name.toLowerCase() : 'sales partner';
+                const txBranch = t.branch || (salesObj ? salesObj.branch : 'PYK');
+
+                const matchBranch = selectedBranch ? txBranch === selectedBranch : true;
+                const matchSalesSelect = selectedSalesId ? t.sales_id === selectedSalesId : true;
+                const matchSearch = searchKeyword ? salesName.includes(searchKeyword) : true;
+
+                return matchBranch && matchSalesSelect && matchSearch;
+            });
         }
 
         function renderReportTable() {
             const tableBody = document.getElementById('reportTable');
             tableBody.innerHTML = '';
 
-            const selectedSalesId = document.getElementById('salesSelectFilter').value;
-            const searchKeyword = document.getElementById('searchSalesInput').value.toLowerCase().trim();
-
-            const filteredData = rawTransactionsData.filter(t => {
-                const salesName = (t.sales_id && usersMap[t.sales_id]) ? usersMap[t.sales_id].toLowerCase() : 'sales partner';
-                
-                const matchSalesSelect = selectedSalesId ? t.sales_id === selectedSalesId : true;
-                const matchSearch = searchKeyword ? salesName.includes(searchKeyword) : true;
-
-                return matchSalesSelect && matchSearch;
-            });
+            const filteredData = getFilteredTransactions();
 
             if (!filteredData || filteredData.length === 0) {
                 document.getElementById('statTotalRevenue').innerText = 'Rp 0';
@@ -234,7 +301,7 @@
                 document.getElementById('statTotalCups').innerText = '0 Cup';
                 document.getElementById('statTotalRoti').innerText = '0 Pcs';
 
-                tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Tidak ada data transaksi yang cocok dengan filter.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-zinc-400">Tidak ada data transaksi yang cocok dengan filter.</td></tr>`;
                 return;
             }
 
@@ -271,12 +338,16 @@
                 grandTotalCups += rowCups;
                 grandTotalRoti += rowRoti;
 
-                const salesName = (t.sales_id && usersMap[t.sales_id]) ? usersMap[t.sales_id] : 'Sales Partner';
+                const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
+                const salesName = salesObj ? salesObj.name : 'Sales Partner';
+                const txBranchCode = t.branch || (salesObj ? salesObj.branch : 'PYK');
+                const branchLabel = getBranchLabel(txBranchCode);
                 const dateStr = new Date(t.created_at).toLocaleString('id-ID');
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-700">${branchLabel}</td>
                     <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
                     <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowCups} Cup</td>
                     <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowRoti} Pcs</td>
@@ -294,6 +365,115 @@
             document.getElementById('statTotalCount').innerText = `${filteredData.length} Transaksi`;
             document.getElementById('statTotalCups').innerText = `${grandTotalCups} Cup`;
             document.getElementById('statTotalRoti').innerText = `${grandTotalRoti} Pcs`;
+        }
+
+        function exportToExcel() {
+            const filteredData = getFilteredTransactions();
+            if (filteredData.length === 0) {
+                alert('Tidak ada data transaksi untuk diexport!');
+                return;
+            }
+
+            const exportRows = filteredData.map(t => {
+                const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
+                let rowCups = 0;
+                let rowRoti = 0;
+
+                let parsedItems = t.items;
+                if (typeof parsedItems === 'string') {
+                    try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
+                }
+
+                if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+                    parsedItems.forEach(item => {
+                        const cat = (item.category || item.name || '').toLowerCase();
+                        const qty = parseInt(item.quantity || item.qty || 1);
+                        if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
+                            rowRoti += qty;
+                        } else {
+                            rowCups += qty;
+                        }
+                    });
+                } else {
+                    rowCups = t.total_cups || 0;
+                }
+
+                return {
+                    'Waktu Transaksi': new Date(t.created_at).toLocaleString('id-ID'),
+                    'Cabang': getBranchLabel(t.branch || (salesObj ? salesObj.branch : 'PYK')),
+                    'Nama Sales': salesObj ? salesObj.name : 'Sales Partner',
+                    'Jumlah Cup': rowCups,
+                    'Jumlah Roti': rowRoti,
+                    'Metode Pembayaran': t.payment_method || 'CASH',
+                    'Total Transaksi (Rp)': t.total_price || 0
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(exportRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Penjualan');
+            XLSX.writeFile(workbook, `Laporan_Penjualan_Kopi_Ajoe_${currentFilter}.xlsx`);
+        }
+
+        function exportToPDF() {
+            const filteredData = getFilteredTransactions();
+            if (filteredData.length === 0) {
+                alert('Tidak ada data transaksi untuk diexport!');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('landscape');
+
+            doc.setFontSize(16);
+            doc.text('Laporan Penjualan Kopi Ajoe', 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Periode: ${currentFilter.toUpperCase()} | Dicetak: ${new Date().toLocaleString('id-ID')}`, 14, 22);
+
+            const tableRows = filteredData.map(t => {
+                const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
+                let rowCups = 0;
+                let rowRoti = 0;
+
+                let parsedItems = t.items;
+                if (typeof parsedItems === 'string') {
+                    try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
+                }
+
+                if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+                    parsedItems.forEach(item => {
+                        const cat = (item.category || item.name || '').toLowerCase();
+                        const qty = parseInt(item.quantity || item.qty || 1);
+                        if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
+                            rowRoti += qty;
+                        } else {
+                            rowCups += qty;
+                        }
+                    });
+                } else {
+                    rowCups = t.total_cups || 0;
+                }
+
+                return [
+                    new Date(t.created_at).toLocaleString('id-ID'),
+                    getBranchLabel(t.branch || (salesObj ? salesObj.branch : 'PYK')),
+                    salesObj ? salesObj.name : 'Sales Partner',
+                    `${rowCups} Cup`,
+                    `${rowRoti} Pcs`,
+                    t.payment_method || 'CASH',
+                    `Rp ${(t.total_price || 0).toLocaleString('id-ID')}`
+                ];
+            });
+
+            doc.autoTable({
+                head: [['Waktu', 'Cabang', 'Nama Sales', 'Jumlah Cup', 'Jumlah Roti', 'Metode', 'Total Transaksi']],
+                body: tableRows,
+                startY: 28,
+                theme: 'striped',
+                headStyles: { fillColor: [0, 0, 0] }
+            });
+
+            doc.save(`Laporan_Penjualan_Kopi_Ajoe_${currentFilter}.pdf`);
         }
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {
