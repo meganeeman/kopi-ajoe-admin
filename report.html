@@ -45,7 +45,7 @@
         </aside>
 
         <main class="flex-1 overflow-y-auto p-8">
-            <header class="flex justify-between items-center mb-8">
+            <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                     <h2 class="text-2xl font-extrabold text-zinc-900">Rekap Laporan Penjualan</h2>
                     <p class="text-xs text-zinc-500 mt-1">Pantau rincian keuangan dan omzet penjualan sales secara berkala.</p>
@@ -85,9 +85,24 @@
             </div>
 
             <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
-                <div class="flex justify-between items-center mb-5">
-                    <h3 class="font-extrabold text-zinc-900 text-base">Rincian Riwayat Transaksi</h3>
-                    <span id="reportStatusText" class="text-xs font-semibold text-zinc-500">Menampilkan data harian</span>
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                    <div>
+                        <h3 class="font-extrabold text-zinc-900 text-base">Rincian Riwayat Transaksi</h3>
+                        <span id="reportStatusText" class="text-xs font-semibold text-zinc-500">Menampilkan data harian</span>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <select id="salesSelectFilter" onchange="renderReportTable()" class="w-full sm:w-auto px-3 py-2 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black">
+                            <option value="">-- Semua Sales --</option>
+                        </select>
+                        <input 
+                            type="text" 
+                            id="searchSalesInput" 
+                            oninput="renderReportTable()" 
+                            placeholder="Cari nama sales..." 
+                            class="w-full sm:w-64 px-3 py-2 rounded-xl border border-zinc-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-black"
+                        >
+                    </div>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -117,6 +132,8 @@
     <script src="js/supabase.js"></script>
     <script>
         let currentFilter = 'daily';
+        let rawTransactionsData = [];
+        let usersMap = {};
 
         async function checkAuth() {
             const { data: { session } } = await supabaseAdmin.auth.getSession();
@@ -158,7 +175,6 @@
                     startDate.setHours(0, 0, 0, 0);
                 }
 
-                // 1. Fetch data transaksi tanpa relasi
                 const { data: transactions, error } = await supabaseAdmin
                     .from('transactions')
                     .select('id, sales_id, total_price, payment_method, total_cups, created_at, items')
@@ -167,94 +183,117 @@
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
+                rawTransactionsData = transactions || [];
 
-                // 2. Fetch data users untuk pemetaan nama sales
                 const { data: usersData } = await supabaseAdmin
                     .from('users')
                     .select('id, name');
 
-                const usersMap = {};
+                usersMap = {};
+                const salesSelect = document.getElementById('salesSelectFilter');
+                salesSelect.innerHTML = '<option value="">-- Semua Sales --</option>';
+
                 if (usersData) {
                     usersData.forEach(u => {
                         usersMap[u.id] = u.name;
+                        const opt = document.createElement('option');
+                        opt.value = u.id;
+                        opt.innerText = u.name;
+                        salesSelect.appendChild(opt);
                     });
                 }
 
-                const tableBody = document.getElementById('reportTable');
-                tableBody.innerHTML = '';
-
-                if (!transactions || transactions.length === 0) {
-                    document.getElementById('statTotalRevenue').innerText = 'Rp 0';
-                    document.getElementById('statTotalCount').innerText = '0 Transaksi';
-                    document.getElementById('statTotalCups').innerText = '0 Cup';
-                    document.getElementById('statTotalRoti').innerText = '0 Pcs';
-
-                    tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Tidak ada transaksi pada periode ini.</td></tr>`;
-                    return;
-                }
-
-                let totalRev = 0;
-                let grandTotalCups = 0;
-                let grandTotalRoti = 0;
-
-                transactions.forEach(t => {
-                    totalRev += (t.total_price || 0);
-
-                    let rowCups = 0;
-                    let rowRoti = 0;
-
-                    let parsedItems = t.items;
-                    if (typeof parsedItems === 'string') {
-                        try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
-                    }
-
-                    if (Array.isArray(parsedItems) && parsedItems.length > 0) {
-                        parsedItems.forEach(item => {
-                            const cat = (item.category || item.name || '').toLowerCase();
-                            const qty = parseInt(item.quantity || item.qty || 1);
-
-                            if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
-                                rowRoti += qty;
-                            } else {
-                                rowCups += qty;
-                            }
-                        });
-                    } else {
-                        rowCups = t.total_cups || 0;
-                    }
-
-                    grandTotalCups += rowCups;
-                    grandTotalRoti += rowRoti;
-
-                    const salesName = (t.sales_id && usersMap[t.sales_id]) ? usersMap[t.sales_id] : 'Sales Partner';
-                    const dateStr = new Date(t.created_at).toLocaleString('id-ID');
-
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
-                        <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
-                        <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowCups} Cup</td>
-                        <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowRoti} Pcs</td>
-                        <td class="py-3.5 px-2">
-                            <span class="px-2.5 py-1 rounded-md text-[10px] font-bold ${t.payment_method === 'CASH' ? 'bg-zinc-200 text-zinc-800' : 'bg-blue-100 text-blue-800'}">
-                                ${t.payment_method || 'CASH'}
-                            </span>
-                        </td>
-                        <td class="py-3.5 px-2 text-right font-extrabold text-black">Rp ${(t.total_price || 0).toLocaleString('id-ID')}</td>
-                    `;
-                    tableBody.appendChild(tr);
-                });
-
-                document.getElementById('statTotalRevenue').innerText = `Rp ${totalRev.toLocaleString('id-ID')}`;
-                document.getElementById('statTotalCount').innerText = `${transactions.length} Transaksi`;
-                document.getElementById('statTotalCups').innerText = `${grandTotalCups} Cup`;
-                document.getElementById('statTotalRoti').innerText = `${grandTotalRoti} Pcs`;
+                renderReportTable();
 
             } catch (err) {
                 console.error('Error load report data:', err);
                 const tableBody = document.getElementById('reportTable');
                 tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-500 font-semibold">Gagal memuat data: ${err.message || 'Terjadi kesalahan query'}</td></tr>`;
             }
+        }
+
+        function renderReportTable() {
+            const tableBody = document.getElementById('reportTable');
+            tableBody.innerHTML = '';
+
+            const selectedSalesId = document.getElementById('salesSelectFilter').value;
+            const searchKeyword = document.getElementById('searchSalesInput').value.toLowerCase().trim();
+
+            const filteredData = rawTransactionsData.filter(t => {
+                const salesName = (t.sales_id && usersMap[t.sales_id]) ? usersMap[t.sales_id].toLowerCase() : 'sales partner';
+                
+                const matchSalesSelect = selectedSalesId ? t.sales_id === selectedSalesId : true;
+                const matchSearch = searchKeyword ? salesName.includes(searchKeyword) : true;
+
+                return matchSalesSelect && matchSearch;
+            });
+
+            if (!filteredData || filteredData.length === 0) {
+                document.getElementById('statTotalRevenue').innerText = 'Rp 0';
+                document.getElementById('statTotalCount').innerText = '0 Transaksi';
+                document.getElementById('statTotalCups').innerText = '0 Cup';
+                document.getElementById('statTotalRoti').innerText = '0 Pcs';
+
+                tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Tidak ada data transaksi yang cocok dengan filter.</td></tr>`;
+                return;
+            }
+
+            let totalRev = 0;
+            let grandTotalCups = 0;
+            let grandTotalRoti = 0;
+
+            filteredData.forEach(t => {
+                totalRev += (t.total_price || 0);
+
+                let rowCups = 0;
+                let rowRoti = 0;
+
+                let parsedItems = t.items;
+                if (typeof parsedItems === 'string') {
+                    try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
+                }
+
+                if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+                    parsedItems.forEach(item => {
+                        const cat = (item.category || item.name || '').toLowerCase();
+                        const qty = parseInt(item.quantity || item.qty || 1);
+
+                        if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
+                            rowRoti += qty;
+                        } else {
+                            rowCups += qty;
+                        }
+                    });
+                } else {
+                    rowCups = t.total_cups || 0;
+                }
+
+                grandTotalCups += rowCups;
+                grandTotalRoti += rowRoti;
+
+                const salesName = (t.sales_id && usersMap[t.sales_id]) ? usersMap[t.sales_id] : 'Sales Partner';
+                const dateStr = new Date(t.created_at).toLocaleString('id-ID');
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
+                    <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowCups} Cup</td>
+                    <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowRoti} Pcs</td>
+                    <td class="py-3.5 px-2">
+                        <span class="px-2.5 py-1 rounded-md text-[10px] font-bold ${t.payment_method === 'CASH' ? 'bg-zinc-200 text-zinc-800' : 'bg-blue-100 text-blue-800'}">
+                            ${t.payment_method || 'CASH'}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-2 text-right font-extrabold text-black">Rp ${(t.total_price || 0).toLocaleString('id-ID')}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            document.getElementById('statTotalRevenue').innerText = `Rp ${totalRev.toLocaleString('id-ID')}`;
+            document.getElementById('statTotalCount').innerText = `${filteredData.length} Transaksi`;
+            document.getElementById('statTotalCups').innerText = `${grandTotalCups} Cup`;
+            document.getElementById('statTotalRoti').innerText = `${grandTotalRoti} Pcs`;
         }
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {
