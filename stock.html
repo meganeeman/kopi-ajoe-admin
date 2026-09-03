@@ -115,15 +115,23 @@
 
     </div>
 
+    <div id="notifModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold animate-bounce">
+                !
+            </div>
+            <h4 class="text-lg font-extrabold text-zinc-900">Permintaan Stok Baru</h4>
+            <p id="notifModalMessage" class="text-sm text-zinc-600 font-medium">Ada permintaan stok baru.</p>
+            <button onclick="closeNotifModal()" class="w-full bg-black text-white font-bold py-2.5 rounded-xl text-xs hover:bg-zinc-800 transition">
+                Mengerti
+            </button>
+        </div>
+    </div>
+
     <script src="js/supabase.js"></script>
     <script>
         const notifAudio = new Audio('sounds/notif.mp3');
         notifAudio.loop = true;
-
-        notifAudio.addEventListener('error', () => {
-            console.warn('File sounds/notif.mp3 tidak ditemukan, menggunakan suara dari CDN online.');
-            notifAudio.src = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
-        });
 
         function enableAudio() {
             notifAudio.play().then(() => {
@@ -134,7 +142,7 @@
                 btn.classList.remove('bg-amber-500', 'hover:bg-amber-600');
                 btn.classList.add('bg-green-600', 'hover:bg-green-700');
             }).catch(err => {
-                console.error('Izin audio gagal dibuka:', err);
+                console.error('Izin audio gagal diproses:', err);
             });
         }
 
@@ -148,6 +156,19 @@
         function stopNotificationSound() {
             notifAudio.pause();
             notifAudio.currentTime = 0;
+        }
+
+        function showNotifModal(message) {
+            document.getElementById('notifModalMessage').innerText = message;
+            const modal = document.getElementById('notifModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeNotifModal() {
+            const modal = document.getElementById('notifModal');
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
         }
 
         async function checkAuth() {
@@ -386,7 +407,6 @@
                     }
                 }
 
-                alert('Permintaan stok berhasil DISETUJUI dan dimasukkan ke stok sales!');
                 await loadProducts();
                 await loadPendingRequests();
             } catch (err) {
@@ -407,7 +427,6 @@
 
                 if (error) throw error;
 
-                alert('Permintaan stok DITOLAK!');
                 await loadPendingRequests();
             } catch (err) {
                 alert('Gagal menolak request: ' + (err.message || 'Error server'));
@@ -450,7 +469,7 @@
                             }
                         }
 
-                        alert(`Ada permintaan stok dari ${userName}`);
+                        showNotifModal(`Ada permintaan stok dari ${userName}`);
                         await loadPendingRequests();
                     }
                 )
