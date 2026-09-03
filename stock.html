@@ -237,12 +237,15 @@
                 products ( name ),
                 cart_units (
                     active_sales_id,
-                    profiles ( full_name )
+                    users ( name )
                 )
             `)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error load requests:', error);
+            throw error;
+        }
 
         const tableBody = document.getElementById('requestsTable');
         tableBody.innerHTML = '';
@@ -253,7 +256,7 @@
         }
 
         reqs.forEach(r => {
-            const salesName = r.cart_units?.profiles?.full_name || 'Sales Partner';
+            const salesName = r.cart_units?.users?.name || 'Sales Partner';
             const productName = r.products?.name || 'Produk';
             const dateStr = new Date(r.created_at).toLocaleString('id-ID');
             const isPending = r.status === 'pending';
@@ -279,7 +282,7 @@
             tableBody.appendChild(tr);
         });
     } catch (err) {
-        console.log('Error load requests:', err);
+        console.error('Error load requests:', err);
     }
 }
         async function handleApprove(reqId, productId, qty) {
