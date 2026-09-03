@@ -50,6 +50,9 @@
                     <h2 class="text-2xl font-extrabold text-zinc-900">Manajemen Stok & Permintaan Cabang</h2>
                     <p class="text-xs text-zinc-500 mt-1">Kelola masukan stok dari pabrik dan persetujuan request dari sales.</p>
                 </div>
+                <button id="enableAudioBtn" onclick="enableAudio()" class="bg-amber-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-sm hover:bg-amber-600 transition">
+                    Enable Sound Notif
+                </button>
             </header>
 
             <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-8">
@@ -112,33 +115,36 @@
 
     </div>
 
-    <!-- Tambahkan attribute loop pada tag audio -->
-    <audio id="notifSound" preload="auto" loop>
-        <source src="sounds/notif.mp3" type="audio/mpeg">
-    </audio>
+    <audio id="notifSound" src="sounds/notif.mp3" preload="auto" loop></audio>
 
     <script src="js/supabase.js"></script>
     <script>
-        let audioAllowed = false;
+        let isAudioReady = false;
 
-        document.addEventListener('click', () => {
-            if (!audioAllowed) {
-                const sound = document.getElementById('notifSound');
-                if (sound) {
-                    sound.play().then(() => {
-                        sound.pause();
-                        sound.currentTime = 0;
-                        audioAllowed = true;
-                    }).catch(() => {});
-                }
+        function enableAudio() {
+            const sound = document.getElementById('notifSound');
+            if (sound) {
+                sound.play().then(() => {
+                    sound.pause();
+                    sound.currentTime = 0;
+                    isAudioReady = true;
+                    const btn = document.getElementById('enableAudioBtn');
+                    btn.innerText = 'Sound Ready';
+                    btn.classList.remove('bg-amber-500', 'hover:bg-amber-600');
+                    btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                }).catch(err => {
+                    console.error('Gagal mengaktifkan audio:', err);
+                });
             }
-        }, { once: true });
+        }
 
         function startNotificationSound() {
             const sound = document.getElementById('notifSound');
             if (sound) {
                 sound.currentTime = 0;
-                sound.play().catch(err => console.log('Klik area web untuk mengaktifkan izin audio:', err));
+                sound.play().catch(err => {
+                    console.warn('Autoplay terhalang! Klik tombol Enable Sound Notif di kanan atas:', err);
+                });
             }
         }
 
@@ -323,7 +329,6 @@
                     tableBody.appendChild(tr);
                 });
 
-                // Jika sudah tidak ada lagi yang pending, matikan suaranya
                 if (!hasPending) {
                     stopNotificationSound();
                 }
@@ -424,6 +429,11 @@
             await checkAuth();
             await loadProducts();
             await loadPendingRequests();
+
+            // Aktifkan audio otomatis begitu layar diklik pertama kali
+            document.body.addEventListener('click', () => {
+                if (!isAudioReady) enableAudio();
+            }, { once: true });
 
             supabaseAdmin
                 .channel('public:stock_requests')
