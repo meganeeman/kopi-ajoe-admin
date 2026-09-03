@@ -224,61 +224,64 @@
         }
 
         async function loadPendingRequests() {
-            try {
-                const { data: reqs, error } = await supabaseAdmin
-                    .from('stock_requests')
-                    .select(`
-                        id,
-                        quantity,
-                        status,
-                        product_name,
-                        created_at,
-                        product_id,
-                        sales_id,
-                        users ( name )
-                    `)
-                    .order('created_at', { ascending: false });
+    try {
+        const { data: reqs, error } = await supabaseAdmin
+            .from('stock_requests')
+            .select(`
+                id,
+                quantity,
+                status,
+                created_at,
+                product_id,
+                cart_unit_id,
+                products ( name ),
+                cart_units (
+                    active_sales_id,
+                    profiles ( full_name )
+                )
+            `)
+            .order('created_at', { ascending: false });
 
-                if (error) throw error;
+        if (error) throw error;
 
-                const tableBody = document.getElementById('requestsTable');
-                tableBody.innerHTML = '';
+        const tableBody = document.getElementById('requestsTable');
+        tableBody.innerHTML = '';
 
-                if (!reqs || reqs.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Belum ada request stok dari sales.</td></tr>`;
-                    return;
-                }
-
-                reqs.forEach(r => {
-                    const salesName = r.users?.name || 'Sales Partner';
-                    const dateStr = new Date(r.created_at).toLocaleString('id-ID');
-                    const isPending = r.status === 'pending';
-
-                    let statusBadge = `<span class="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-1 rounded-md text-[10px]">PENDING</span>`;
-                    if (r.status === 'approved') statusBadge = `<span class="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DISETUJUI</span>`;
-                    if (r.status === 'rejected') statusBadge = `<span class="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DITOLAK</span>`;
-
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
-                        <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
-                        <td class="py-3.5 px-2 font-semibold text-zinc-800">${r.product_name}</td>
-                        <td class="py-3.5 px-2 text-center font-extrabold text-black">${r.quantity}</td>
-                        <td class="py-3.5 px-2">${statusBadge}</td>
-                        <td class="py-3.5 px-2 text-right space-x-2">
-                            ${isPending ? `
-                                <button onclick="handleApprove('${r.id}', '${r.product_id}', ${r.quantity})" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-800 transition">ACC</button>
-                                <button onclick="handleReject('${r.id}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition">Tolak</button>
-                            ` : `<span class="text-zinc-400 text-[10px] font-semibold">Selesai</span>`}
-                        </td>
-                    `;
-                    tableBody.appendChild(tr);
-                });
-            } catch (err) {
-                console.log('Error load requests:', err);
-            }
+        if (!reqs || reqs.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Belum ada request stok dari sales.</td></tr>`;
+            return;
         }
 
+        reqs.forEach(r => {
+            const salesName = r.cart_units?.profiles?.full_name || 'Sales Partner';
+            const productName = r.products?.name || 'Produk';
+            const dateStr = new Date(r.created_at).toLocaleString('id-ID');
+            const isPending = r.status === 'pending';
+
+            let statusBadge = `<span class="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-1 rounded-md text-[10px]">PENDING</span>`;
+            if (r.status === 'approved') statusBadge = `<span class="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DISETUJUI</span>`;
+            if (r.status === 'rejected') statusBadge = `<span class="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DITOLAK</span>`;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
+                <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
+                <td class="py-3.5 px-2 font-semibold text-zinc-800">${productName}</td>
+                <td class="py-3.5 px-2 text-center font-extrabold text-black">${r.quantity}</td>
+                <td class="py-3.5 px-2">${statusBadge}</td>
+                <td class="py-3.5 px-2 text-right space-x-2">
+                    ${isPending ? `
+                        <button onclick="handleApprove('${r.id}', '${r.product_id}', ${r.quantity})" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-800 transition">ACC</button>
+                        <button onclick="handleReject('${r.id}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition">Tolak</button>
+                    ` : `<span class="text-zinc-400 text-[10px] font-semibold">Selesai</span>`}
+                </td>
+            `;
+            tableBody.appendChild(tr);
+        });
+    } catch (err) {
+        console.log('Error load requests:', err);
+    }
+}
         async function handleApprove(reqId, productId, qty) {
             if (!confirm('Setujui permintaan stok ini?')) return;
             try {
