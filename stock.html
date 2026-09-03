@@ -112,20 +112,41 @@
 
     </div>
 
-    <!-- Element Audio Notifikasi External -->
-    <audio id="notifSound" preload="auto">
-        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+    <!-- Tambahkan attribute loop pada tag audio -->
+    <audio id="notifSound" preload="auto" loop>
+        <source src="sounds/notif.mp3" type="audio/mpeg">
     </audio>
 
     <script src="js/supabase.js"></script>
     <script>
-        function playNotificationSound() {
+        let audioAllowed = false;
+
+        document.addEventListener('click', () => {
+            if (!audioAllowed) {
+                const sound = document.getElementById('notifSound');
+                if (sound) {
+                    sound.play().then(() => {
+                        sound.pause();
+                        sound.currentTime = 0;
+                        audioAllowed = true;
+                    }).catch(() => {});
+                }
+            }
+        }, { once: true });
+
+        function startNotificationSound() {
             const sound = document.getElementById('notifSound');
             if (sound) {
                 sound.currentTime = 0;
-                sound.play().catch(err => {
-                    console.log('Autoplay diblokir oleh browser. Klik area web terlebih dahulu:', err);
-                });
+                sound.play().catch(err => console.log('Klik area web untuk mengaktifkan izin audio:', err));
+            }
+        }
+
+        function stopNotificationSound() {
+            const sound = document.getElementById('notifSound');
+            if (sound) {
+                sound.pause();
+                sound.currentTime = 0;
             }
         }
 
@@ -267,14 +288,19 @@
 
                 if (!reqs || reqs.length === 0) {
                     tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Belum ada request stok dari sales.</td></tr>`;
+                    stopNotificationSound();
                     return;
                 }
+
+                let hasPending = false;
 
                 reqs.forEach(r => {
                     const salesName = r.cart_units?.users?.name || 'Sales Partner';
                     const productName = r.products?.name || 'Produk';
                     const dateStr = new Date(r.created_at).toLocaleString('id-ID');
                     const isPending = r.status === 'pending';
+
+                    if (isPending) hasPending = true;
 
                     let statusBadge = `<span class="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-1 rounded-md text-[10px]">PENDING</span>`;
                     if (r.status === 'approved') statusBadge = `<span class="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DISETUJUI</span>`;
@@ -296,6 +322,11 @@
                     `;
                     tableBody.appendChild(tr);
                 });
+
+                // Jika sudah tidak ada lagi yang pending, matikan suaranya
+                if (!hasPending) {
+                    stopNotificationSound();
+                }
             } catch (err) {
                 console.error('Error load requests:', err);
                 const tableBody = document.getElementById('requestsTable');
@@ -306,6 +337,8 @@
         async function handleApprove(reqId, productId, qty) {
             if (!confirm('Setujui permintaan stok ini?')) return;
             try {
+                stopNotificationSound();
+
                 const { data: reqData, error: reqFetchErr } = await supabaseAdmin
                     .from('stock_requests')
                     .select('cart_unit_id')
@@ -354,7 +387,7 @@
                     }
                 }
 
-                alert(`Permintaan stok (${qty} Cup) berhasil DISETUJUI dan dimasukkan ke stok sales!`);
+                alert('Permintaan stok berhasil DISETUJUI dan dimasukkan ke stok sales!');
                 await loadProducts();
                 await loadPendingRequests();
             } catch (err) {
@@ -366,6 +399,8 @@
         async function handleReject(reqId) {
             if (!confirm('Tolak permintaan stok ini?')) return;
             try {
+                stopNotificationSound();
+
                 const { error } = await supabaseAdmin
                     .from('stock_requests')
                     .update({ status: 'rejected' })
@@ -395,10 +430,25 @@
                 .on(
                     'postgres_changes',
                     { event: 'INSERT', schema: 'public', table: 'stock_requests' },
-                    (payload) => {
+                    async (payload) => {
                         console.log('Ada request stok baru:', payload);
-                        playNotificationSound();
-                        loadPendingRequests();
+                        startNotificationSound();
+
+                        let userName = 'Sales Partner';
+                        if (payload.new && payload.new.cart_unit_id) {
+                            const { data: cartData } = await supabaseAdmin
+                                .from('cart_units')
+                                .select('users(name)')
+                                .eq('id', payload.new.cart_unit_id)
+                                .maybeSingle();
+
+                            if (cartData?.users?.name) {
+                                userName = cartData.users.name;
+                            }
+                        }
+
+                        alert(`Ada permintaan stok dari ${userName}`);
+                        await loadPendingRequests();
                     }
                 )
                 .on(
