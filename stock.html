@@ -24,13 +24,13 @@
 
                 <nav class="space-y-2">
                     <a href="index.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
-                        <span>📊</span> Dashboard Utama
+                        <span>Dashboard Utama</span>
                     </a>
                     <a href="stock.html" class="flex items-center gap-3 px-4 py-3 sidebar-item-active rounded-xl font-bold text-sm">
-                        <span>📦</span> Manajemen Stok
+                        <span>Manajemen Stok</span>
                     </a>
                     <a href="report.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
-                        <span>📈</span> Laporan Penjualan
+                        <span>Laporan Penjualan</span>
                     </a>
                 </nav>
             </div>
@@ -85,7 +85,7 @@
             <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
                 <div class="flex justify-between items-center mb-5">
                     <h3 class="font-extrabold text-zinc-900 text-base">Daftar Permintaan Stok Sales (Request Cabang)</h3>
-                    <button onclick="loadPendingRequests()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">🔄 Refresh Request</button>
+                    <button onclick="loadPendingRequests()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">Refresh Request</button>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -224,81 +224,124 @@
         }
 
         async function loadPendingRequests() {
-    try {
-        const { data: reqs, error } = await supabaseAdmin
-            .from('stock_requests')
-            .select(`
-                id,
-                quantity,
-                status,
-                created_at,
-                product_id,
-                cart_unit_id,
-                products ( name ),
-                cart_units (
-                    active_sales_id,
-                    users ( name )
-                )
-            `)
-            .order('created_at', { ascending: false });
+            try {
+                const { data: reqs, error } = await supabaseAdmin
+                    .from('stock_requests')
+                    .select(`
+                        id,
+                        quantity,
+                        status,
+                        created_at,
+                        product_id,
+                        cart_unit_id,
+                        products ( name ),
+                        cart_units (
+                            active_sales_id,
+                            users ( name )
+                        )
+                    `)
+                    .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error('Error load requests:', error);
-            throw error;
+                if (error) {
+                    console.error('Error load requests:', error);
+                    throw error;
+                }
+
+                const tableBody = document.getElementById('requestsTable');
+                tableBody.innerHTML = '';
+
+                if (!reqs || reqs.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Belum ada request stok dari sales.</td></tr>`;
+                    return;
+                }
+
+                reqs.forEach(r => {
+                    const salesName = r.cart_units?.users?.name || 'Sales Partner';
+                    const productName = r.products?.name || 'Produk';
+                    const dateStr = new Date(r.created_at).toLocaleString('id-ID');
+                    const isPending = r.status === 'pending';
+
+                    let statusBadge = `<span class="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-1 rounded-md text-[10px]">PENDING</span>`;
+                    if (r.status === 'approved') statusBadge = `<span class="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DISETUJUI</span>`;
+                    if (r.status === 'rejected') statusBadge = `<span class="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DITOLAK</span>`;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
+                        <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
+                        <td class="py-3.5 px-2 font-semibold text-zinc-800">${productName}</td>
+                        <td class="py-3.5 px-2 text-center font-extrabold text-black">${r.quantity}</td>
+                        <td class="py-3.5 px-2">${statusBadge}</td>
+                        <td class="py-3.5 px-2 text-right space-x-2">
+                            ${isPending ? `
+                                <button onclick="handleApprove('${r.id}', '${r.product_id}', ${r.quantity})" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-800 transition">ACC</button>
+                                <button onclick="handleReject('${r.id}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition">Tolak</button>
+                            ` : `<span class="text-zinc-400 text-[10px] font-semibold">Selesai</span>`}
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error('Error load requests:', err);
+            }
         }
 
-        const tableBody = document.getElementById('requestsTable');
-        tableBody.innerHTML = '';
-
-        if (!reqs || reqs.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Belum ada request stok dari sales.</td></tr>`;
-            return;
-        }
-
-        reqs.forEach(r => {
-            const salesName = r.cart_units?.users?.name || 'Sales Partner';
-            const productName = r.products?.name || 'Produk';
-            const dateStr = new Date(r.created_at).toLocaleString('id-ID');
-            const isPending = r.status === 'pending';
-
-            let statusBadge = `<span class="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-1 rounded-md text-[10px]">PENDING</span>`;
-            if (r.status === 'approved') statusBadge = `<span class="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DISETUJUI</span>`;
-            if (r.status === 'rejected') statusBadge = `<span class="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DITOLAK</span>`;
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
-                <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
-                <td class="py-3.5 px-2 font-semibold text-zinc-800">${productName}</td>
-                <td class="py-3.5 px-2 text-center font-extrabold text-black">${r.quantity}</td>
-                <td class="py-3.5 px-2">${statusBadge}</td>
-                <td class="py-3.5 px-2 text-right space-x-2">
-                    ${isPending ? `
-                        <button onclick="handleApprove('${r.id}', '${r.product_id}', ${r.quantity})" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-800 transition">ACC</button>
-                        <button onclick="handleReject('${r.id}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition">Tolak</button>
-                    ` : `<span class="text-zinc-400 text-[10px] font-semibold">Selesai</span>`}
-                </td>
-            `;
-            tableBody.appendChild(tr);
-        });
-    } catch (err) {
-        console.error('Error load requests:', err);
-    }
-}
         async function handleApprove(reqId, productId, qty) {
             if (!confirm('Setujui permintaan stok ini?')) return;
             try {
-                const { error } = await supabaseAdmin
+                const { data: reqData, error: reqFetchErr } = await supabaseAdmin
+                    .from('stock_requests')
+                    .select('cart_unit_id')
+                    .eq('id', reqId)
+                    .single();
+
+                if (reqFetchErr) throw reqFetchErr;
+
+                const cartUnitId = reqData.cart_unit_id;
+
+                const { error: updateStatusErr } = await supabaseAdmin
                     .from('stock_requests')
                     .update({ status: 'approved' })
                     .eq('id', reqId);
 
-                if (error) throw error;
+                if (updateStatusErr) throw updateStatusErr;
 
-                alert('Permintaan stok berhasil DISETUJUI!');
+                if (cartUnitId) {
+                    const { data: existingStock, error: stockFetchErr } = await supabaseAdmin
+                        .from('cart_stocks')
+                        .select('id, quantity')
+                        .eq('cart_unit_id', cartUnitId)
+                        .eq('product_id', productId)
+                        .maybeSingle();
+
+                    if (stockFetchErr) throw stockFetchErr;
+
+                    if (existingStock) {
+                        const newQuantity = (existingStock.quantity || 0) + parseInt(qty, 10);
+                        const { error: stockUpdateErr } = await supabaseAdmin
+                            .from('cart_stocks')
+                            .update({ quantity: newQuantity })
+                            .eq('id', existingStock.id);
+
+                        if (stockUpdateErr) throw stockUpdateErr;
+                    } else {
+                        const { error: stockInsertErr } = await supabaseAdmin
+                            .from('cart_stocks')
+                            .insert({
+                                cart_unit_id: cartUnitId,
+                                product_id: productId,
+                                quantity: parseInt(qty, 10)
+                            });
+
+                        if (stockInsertErr) throw stockInsertErr;
+                    }
+                }
+
+                alert('Permintaan stok berhasil DISETUJUI dan dimasukkan ke stok sales!');
                 await loadProducts();
                 await loadPendingRequests();
             } catch (err) {
+                console.error('Error approve request:', err);
                 alert('Gagal menyetujui request: ' + (err.message || 'Error server'));
             }
         }
@@ -329,6 +372,18 @@
             await checkAuth();
             await loadProducts();
             await loadPendingRequests();
+
+            supabaseAdmin
+                .channel('public:stock_requests')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'stock_requests' },
+                    (payload) => {
+                        console.log('Ada perubahan data request stok:', payload);
+                        loadPendingRequests();
+                    }
+                )
+                .subscribe();
         });
     </script>
 </body>
