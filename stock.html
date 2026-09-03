@@ -84,7 +84,7 @@
 
             <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
                 <div class="flex justify-between items-center mb-5">
-                    <h3 class="font-extrabold text-zinc-900 text-base">Daftar Permintaan Stok Sales</h3>
+                    <h3 class="font-extrabold text-zinc-900 text-base">Daftar Permintaan Stok Sales (Request Cabang)</h3>
                     <button onclick="loadPendingRequests()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">Refresh Request</button>
                 </div>
 
@@ -283,69 +283,12 @@
                 });
             } catch (err) {
                 console.error('Error load requests:', err);
+                const tableBody = document.getElementById('requestsTable');
+                tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-500 font-bold">Gagal memuat data permintaan stok.</td></tr>`;
             }
         }
 
         async function handleApprove(reqId, productId, qty) {
-    if (!confirm('Setujui permintaan stok ini?')) return;
-    try {
-        const { data: reqData, error: reqFetchErr } = await supabaseAdmin
-            .from('stock_requests')
-            .select('cart_unit_id, products(name)')
-            .eq('id', reqId)
-            .single();
-
-        if (reqFetchErr) throw reqFetchErr;
-
-        const cartUnitId = reqData?.cart_unit_id;
-        const productName = reqData?.products?.name || 'Produk';
-
-        const { error: updateStatusErr } = await supabaseAdmin
-            .from('stock_requests')
-            .update({ status: 'approved' })
-            .eq('id', reqId);
-
-        if (updateStatusErr) throw updateStatusErr;
-
-        if (cartUnitId) {
-            const { data: existingStock, error: stockFetchErr } = await supabaseAdmin
-                .from('cart_stocks')
-                .select('id, quantity')
-                .eq('cart_unit_id', cartUnitId)
-                .eq('product_id', productId)
-                .maybeSingle();
-
-            if (stockFetchErr) throw stockFetchErr;
-
-            if (existingStock) {
-                const newQuantity = (existingStock.quantity || 0) + parseInt(qty, 10);
-                const { error: stockUpdateErr } = await supabaseAdmin
-                    .from('cart_stocks')
-                    .update({ quantity: newQuantity })
-                    .eq('id', existingStock.id);
-
-                if (stockUpdateErr) throw stockUpdateErr;
-            } else {
-                const { error: stockInsertErr } = await supabaseAdmin
-                    .from('cart_stocks')
-                    .insert({
-                        cart_unit_id: cartUnitId,
-                        product_id: productId,
-                        quantity: parseInt(qty, 10)
-                    });
-
-                if (stockInsertErr) throw stockInsertErr;
-            }
-        }
-
-        alert(`Permintaan stok ${productName} (${qty} Cup) berhasil DISETUJUI dan dimasukkan ke stok sales!`);
-        await loadProducts();
-        await loadPendingRequests();
-    } catch (err) {
-        console.error('Error approve request:', err);
-        alert('Gagal menyetujui request: ' + (err.message || 'Error server'));
-    }
-}
             if (!confirm('Setujui permintaan stok ini?')) return;
             try {
                 const { data: reqData, error: reqFetchErr } = await supabaseAdmin
@@ -356,7 +299,7 @@
 
                 if (reqFetchErr) throw reqFetchErr;
 
-                const cartUnitId = reqData.cart_unit_id;
+                const cartUnitId = reqData?.cart_unit_id;
 
                 const { error: updateStatusErr } = await supabaseAdmin
                     .from('stock_requests')
@@ -396,7 +339,7 @@
                     }
                 }
 
-                alert('Permintaan stok berhasil DISETUJUI dan dimasukkan ke stok sales!');
+                alert(`Permintaan stok (${qty} Cup) berhasil DISETUJUI dan dimasukkan ke stok sales!`);
                 await loadProducts();
                 await loadPendingRequests();
             } catch (err) {
