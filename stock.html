@@ -48,7 +48,7 @@
             <header class="flex justify-between items-center mb-8">
                 <div>
                     <h2 class="text-2xl font-extrabold text-zinc-900">Manajemen Stok & Permintaan Cabang</h2>
-                    <p class="text-xs text-zinc-500 mt-1">Kelola masukan stok dari pabrik dan persetujuan request dari sales.</p>
+                    <p class="text-xs text-zinc-500 mt-1">Kelola masukan stok dari pabrik, persetujuan request, dan pengembalian stok sales.</p>
                 </div>
                 <button id="enableAudioBtn" onclick="enableAudio()" class="bg-amber-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-sm hover:bg-amber-600 transition">
                     Tes / Aktifkan Suara Notif
@@ -86,25 +86,35 @@
             </div>
 
             <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
-                <div class="flex justify-between items-center mb-5">
-                    <h3 class="font-extrabold text-zinc-900 text-base">Daftar Permintaan Stok Sales (Request Cabang)</h3>
-                    <button onclick="loadPendingRequests()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">Refresh Request</button>
+                <!-- Tab Switcher Header -->
+                <div class="flex justify-between items-center mb-5 border-b border-zinc-100 pb-4">
+                    <div class="flex gap-2 bg-zinc-100 p-1 rounded-xl">
+                        <button id="tabRequestBtn" onclick="switchTab('request')" class="px-4 py-2 rounded-lg font-bold text-xs bg-white text-black shadow-sm transition">
+                            Permintaan Stok (Request)
+                        </button>
+                        <button id="tabReturnBtn" onclick="switchTab('return')" class="px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition">
+                            Pengembalian Stok (Return)
+                        </button>
+                    </div>
+                    <button onclick="loadActiveTabData()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">
+                        Refresh Data
+                    </button>
                 </div>
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase">
-                                <th class="py-3 px-2">Waktu Request</th>
+                                <th class="py-3 px-2">Waktu Pengajuan</th>
                                 <th class="py-3 px-2">Nama Sales</th>
-                                <th class="py-3 px-2 text-center">Total Item Requested</th>
+                                <th class="py-3 px-2 text-center">Total Item</th>
                                 <th class="py-3 px-2">Status</th>
                                 <th class="py-3 px-2 text-right">Aksi Admin</th>
                             </tr>
                         </thead>
                         <tbody id="requestsTable" class="text-xs divide-y divide-zinc-50 font-medium text-zinc-700">
                             <tr>
-                                <td colspan="5" class="py-8 text-center text-zinc-400">Memuat permintaan stok...</td>
+                                <td colspan="5" class="py-8 text-center text-zinc-400">Memuat data...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -128,12 +138,12 @@
         </div>
     </div>
 
-    <!-- Modal Detail Request per Sales -->
+    <!-- Modal Detail Request/Return per Sales -->
     <div id="detailModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-zinc-100 pb-3">
                 <div>
-                    <h4 id="modalSalesName" class="text-base font-extrabold text-zinc-900">Detail Request Sales</h4>
+                    <h4 id="modalSalesName" class="text-base font-extrabold text-zinc-900">Detail Pengajuan Sales</h4>
                     <p id="modalTime" class="text-xs text-zinc-400"></p>
                 </div>
                 <button onclick="closeDetailModal()" class="text-zinc-400 hover:text-black font-bold text-lg">&times;</button>
@@ -144,7 +154,7 @@
             </div>
 
             <div class="pt-3 flex justify-end gap-2" id="modalActionButtons">
-                <!-- Tombol ACC dan Tolak sekaligus -->
+                <!-- Tombol Setujui dan Tolak -->
             </div>
         </div>
     </div>
@@ -154,7 +164,8 @@
         const notifAudio = new Audio('sounds/notif.mp3');
         notifAudio.loop = true;
 
-        let globalGroupedRequests = {};
+        let activeTab = 'request';
+        let globalGroupedData = {};
 
         function enableAudio() {
             notifAudio.play().then(() => {
@@ -198,6 +209,30 @@
             const modal = document.getElementById('detailModal');
             modal.classList.remove('flex');
             modal.classList.add('hidden');
+        }
+
+        function switchTab(tabName) {
+            activeTab = tabName;
+            const reqBtn = document.getElementById('tabRequestBtn');
+            const retBtn = document.getElementById('tabReturnBtn');
+
+            if (tabName === 'request') {
+                reqBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs bg-white text-black shadow-sm transition';
+                retBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition';
+            } else {
+                retBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs bg-white text-black shadow-sm transition';
+                reqBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition';
+            }
+
+            loadActiveTabData();
+        }
+
+        function loadActiveTabData() {
+            if (activeTab === 'request') {
+                loadPendingRequests();
+            } else {
+                loadPendingReturns();
+            }
         }
 
         async function checkAuth() {
@@ -330,87 +365,124 @@
 
                 if (error) throw error;
 
-                const tableBody = document.getElementById('requestsTable');
-                tableBody.innerHTML = '';
-
-                if (!reqs || reqs.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-zinc-400">Belum ada request stok dari sales.</td></tr>`;
-                    stopNotificationSound();
-                    return;
-                }
-
-                // Pengelompokan Request Berdasarkan cart_unit_id / Sales Name
-                globalGroupedRequests = {};
-                let hasPendingGlobal = false;
-
-                reqs.forEach(r => {
-                    const salesName = r.cart_units?.users?.name || 'Sales Partner';
-                    const cartUnitId = r.cart_unit_id || 'unknown';
-                    const key = `${cartUnitId}_${r.status}`;
-
-                    if (r.status === 'pending') hasPendingGlobal = true;
-
-                    if (!globalGroupedRequests[key]) {
-                        globalGroupedRequests[key] = {
-                            cartUnitId: cartUnitId,
-                            salesName: salesName,
-                            status: r.status,
-                            latestTime: r.created_at,
-                            totalQuantity: 0,
-                            items: []
-                        };
-                    }
-
-                    globalGroupedRequests[key].totalQuantity += parseInt(r.quantity, 10);
-                    globalGroupedRequests[key].items.push({
-                        reqId: r.id,
-                        productId: r.product_id,
-                        productName: r.products?.name || 'Produk',
-                        quantity: r.quantity
-                    });
-                });
-
-                Object.keys(globalGroupedRequests).forEach(groupKey => {
-                    const group = globalGroupedRequests[groupKey];
-                    const dateStr = new Date(group.latestTime).toLocaleString('id-ID');
-                    const isPending = group.status === 'pending';
-
-                    let statusBadge = `<span class="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-1 rounded-md text-[10px]">PENDING</span>`;
-                    if (group.status === 'approved') statusBadge = `<span class="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DISETUJUI</span>`;
-                    if (group.status === 'rejected') statusBadge = `<span class="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DITOLAK</span>`;
-
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
-                        <td class="py-3.5 px-2 font-bold text-zinc-900">${group.salesName}</td>
-                        <td class="py-3.5 px-2 text-center font-extrabold text-black">${group.items.length} Macam (${group.totalQuantity} Cup)</td>
-                        <td class="py-3.5 px-2">${statusBadge}</td>
-                        <td class="py-3.5 px-2 text-right space-x-2">
-                            <button onclick="openDetailModal('${groupKey}')" class="bg-zinc-100 text-zinc-800 px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-200 transition text-xs">Detail Items</button>
-                            ${isPending ? `
-                                <button onclick="handleGroupApprove('${groupKey}')" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-800 transition text-xs">Setujui</button>
-                                <button onclick="handleGroupReject('${groupKey}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition text-xs">Tolak</button>
-                            ` : `<span class="text-zinc-400 text-[10px] font-semibold">Selesai</span>`}
-                        </td>
-                    `;
-                    tableBody.appendChild(tr);
-                });
-
-                if (!hasPendingGlobal) {
-                    stopNotificationSound();
-                }
+                renderGroupedTable(reqs, 'request');
             } catch (err) {
                 console.error('Error load requests:', err);
-                const tableBody = document.getElementById('requestsTable');
-                tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-500 font-bold">Gagal memuat data permintaan stok.</td></tr>`;
+                renderTableError('Gagal memuat data permintaan stok.');
             }
         }
 
+        async function loadPendingReturns() {
+            try {
+                const { data: rets, error } = await supabaseAdmin
+                    .from('stock_returns')
+                    .select(`
+                        id,
+                        quantity,
+                        status,
+                        created_at,
+                        product_id,
+                        cart_unit_id,
+                        products ( name ),
+                        cart_units (
+                            active_sales_id,
+                            users ( name )
+                        )
+                    `)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                renderGroupedTable(rets, 'return');
+            } catch (err) {
+                console.error('Error load returns:', err);
+                renderTableError('Gagal memuat data pengembalian stok.');
+            }
+        }
+
+        function renderGroupedTable(dataItems, type) {
+            const tableBody = document.getElementById('requestsTable');
+            tableBody.innerHTML = '';
+
+            if (!dataItems || dataItems.length === 0) {
+                const label = type === 'request' ? 'permintaan' : 'pengembalian';
+                tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-zinc-400">Belum ada ${label} stok dari sales.</td></tr>`;
+                stopNotificationSound();
+                return;
+            }
+
+            globalGroupedData = {};
+            let hasPendingGlobal = false;
+
+            dataItems.forEach(item => {
+                const salesName = item.cart_units?.users?.name || 'Sales Partner';
+                const cartUnitId = item.cart_unit_id || 'unknown';
+                const key = `${cartUnitId}_${item.status}`;
+
+                if (item.status === 'pending') hasPendingGlobal = true;
+
+                if (!globalGroupedData[key]) {
+                    globalGroupedData[key] = {
+                        cartUnitId: cartUnitId,
+                        salesName: salesName,
+                        status: item.status,
+                        latestTime: item.created_at,
+                        totalQuantity: 0,
+                        items: []
+                    };
+                }
+
+                globalGroupedData[key].totalQuantity += parseInt(item.quantity, 10);
+                globalGroupedData[key].items.push({
+                    itemId: item.id,
+                    productId: item.product_id,
+                    productName: item.products?.name || 'Produk',
+                    quantity: item.quantity
+                });
+            });
+
+            Object.keys(globalGroupedData).forEach(groupKey => {
+                const group = globalGroupedData[groupKey];
+                const dateStr = new Date(group.latestTime).toLocaleString('id-ID');
+                const isPending = group.status === 'pending';
+
+                let statusBadge = `<span class="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-1 rounded-md text-[10px]">PENDING</span>`;
+                if (group.status === 'approved') statusBadge = `<span class="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DISETUJUI</span>`;
+                if (group.status === 'rejected') statusBadge = `<span class="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DITOLAK</span>`;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-900">${group.salesName}</td>
+                    <td class="py-3.5 px-2 text-center font-extrabold text-black">${group.items.length} Macam (${group.totalQuantity} Cup)</td>
+                    <td class="py-3.5 px-2">${statusBadge}</td>
+                    <td class="py-3.5 px-2 text-right space-x-2">
+                        <button onclick="openDetailModal('${groupKey}')" class="bg-zinc-100 text-zinc-800 px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-200 transition text-xs">Detail Items</button>
+                        ${isPending ? `
+                            <button onclick="handleGroupApprove('${groupKey}')" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-800 transition text-xs">Setujui</button>
+                            <button onclick="handleGroupReject('${groupKey}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition text-xs">Tolak</button>
+                        ` : `<span class="text-zinc-400 text-[10px] font-semibold">Selesai</span>`}
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            if (!hasPendingGlobal) {
+                stopNotificationSound();
+            }
+        }
+
+        function renderTableError(message) {
+            const tableBody = document.getElementById('requestsTable');
+            tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-500 font-bold">${message}</td></tr>`;
+        }
+
         function openDetailModal(groupKey) {
-            const group = globalGroupedRequests[groupKey];
+            const group = globalGroupedData[groupKey];
             if (!group) return;
 
-            document.getElementById('modalSalesName').innerText = `Request dari: ${group.salesName}`;
+            const titlePrefix = activeTab === 'request' ? 'Request' : 'Pengembalian';
+            document.getElementById('modalSalesName').innerText = `${titlePrefix} dari: ${group.salesName}`;
             document.getElementById('modalTime').innerText = `Waktu: ${new Date(group.latestTime).toLocaleString('id-ID')}`;
 
             const listContainer = document.getElementById('detailItemsList');
@@ -433,7 +505,7 @@
                     <button onclick="handleGroupApprove('${groupKey}')" class="bg-black text-white px-4 py-2 rounded-xl font-bold hover:bg-zinc-800 text-xs transition">Setujui</button>
                 `;
             } else {
-                actionContainer.innerHTML = `<span class="text-xs text-zinc-400 font-bold">Request ini sudah selesai (${group.status})</span>`;
+                actionContainer.innerHTML = `<span class="text-xs text-zinc-400 font-bold">Pengajuan ini sudah selesai (${group.status})</span>`;
             }
 
             const modal = document.getElementById('detailModal');
@@ -442,76 +514,121 @@
         }
 
         async function handleGroupApprove(groupKey) {
-            const group = globalGroupedRequests[groupKey];
+            const group = globalGroupedData[groupKey];
             if (!group) return;
 
             closeDetailModal();
             stopNotificationSound();
 
             try {
-                for (const item of group.items) {
-                    // Update status stock_requests jadi approved
-                    await supabaseAdmin
-                        .from('stock_requests')
-                        .update({ status: 'approved' })
-                        .eq('id', item.reqId);
+                if (activeTab === 'request') {
+                    for (const item of group.items) {
+                        await supabaseAdmin
+                            .from('stock_requests')
+                            .update({ status: 'approved' })
+                            .eq('id', item.itemId);
 
-                    // Pindahkan / Tambahkan stok ke cart_stocks
-                    if (group.cartUnitId && group.cartUnitId !== 'unknown') {
-                        const { data: existingStock } = await supabaseAdmin
-                            .from('cart_stocks')
-                            .select('id, quantity')
-                            .eq('cart_unit_id', group.cartUnitId)
+                        if (group.cartUnitId && group.cartUnitId !== 'unknown') {
+                            const { data: existingStock } = await supabaseAdmin
+                                .from('cart_stocks')
+                                .select('id, quantity')
+                                .eq('cart_unit_id', group.cartUnitId)
+                                .eq('product_id', item.productId)
+                                .maybeSingle();
+
+                            if (existingStock) {
+                                const newQty = (existingStock.quantity || 0) + parseInt(item.quantity, 10);
+                                await supabaseAdmin
+                                    .from('cart_stocks')
+                                    .update({ quantity: newQty })
+                                    .eq('id', existingStock.id);
+                            } else {
+                                await supabaseAdmin
+                                    .from('cart_stocks')
+                                    .insert({
+                                        cart_unit_id: group.cartUnitId,
+                                        product_id: item.productId,
+                                        quantity: parseInt(item.quantity, 10)
+                                    });
+                            }
+                        }
+                    }
+                    showNotifModal(`Berhasil menyetujui permintaan stok dari ${group.salesName}!`);
+                } else {
+                    for (const item of group.items) {
+                        await supabaseAdmin
+                            .from('stock_returns')
+                            .update({ status: 'approved' })
+                            .eq('id', item.itemId);
+
+                        if (group.cartUnitId && group.cartUnitId !== 'unknown') {
+                            const { data: existingStock } = await supabaseAdmin
+                                .from('cart_stocks')
+                                .select('id, quantity')
+                                .eq('cart_unit_id', group.cartUnitId)
+                                .eq('product_id', item.productId)
+                                .maybeSingle();
+
+                            if (existingStock) {
+                                const remainingQty = Math.max(0, (existingStock.quantity || 0) - parseInt(item.quantity, 10));
+                                await supabaseAdmin
+                                    .from('cart_stocks')
+                                    .update({ quantity: remainingQty })
+                                    .eq('id', existingStock.id);
+                            }
+                        }
+
+                        const { data: inv } = await supabaseAdmin
+                            .from('inventory')
+                            .select('id, stock')
                             .eq('product_id', item.productId)
                             .maybeSingle();
 
-                        if (existingStock) {
-                            const newQty = (existingStock.quantity || 0) + parseInt(item.quantity, 10);
+                        if (inv) {
+                            const newInvTotal = (inv.stock || 0) + parseInt(item.quantity, 10);
                             await supabaseAdmin
-                                .from('cart_stocks')
-                                .update({ quantity: newQty })
-                                .eq('id', existingStock.id);
+                                .from('inventory')
+                                .update({ stock: newInvTotal })
+                                .eq('id', inv.id);
                         } else {
                             await supabaseAdmin
-                                .from('cart_stocks')
-                                .insert({
-                                    cart_unit_id: group.cartUnitId,
-                                    product_id: item.productId,
-                                    quantity: parseInt(item.quantity, 10)
-                                });
+                                .from('inventory')
+                                .insert({ product_id: item.productId, stock: parseInt(item.quantity, 10) });
                         }
                     }
+                    showNotifModal(`Berhasil menyetujui pengembalian stok dari ${group.salesName}!`);
                 }
 
-                showNotifModal(`Berhasil menyetujui seluruh permintaan stok dari ${group.salesName}!`);
                 await loadProducts();
-                await loadPendingRequests();
+                await loadActiveTabData();
             } catch (err) {
                 console.error('Error approve group:', err);
-                showNotifModal('Gagal menyetujui permintaan: ' + (err.message || 'Error server'));
+                showNotifModal('Gagal menyetujui pengajuan: ' + (err.message || 'Error server'));
             }
         }
 
         async function handleGroupReject(groupKey) {
-            const group = globalGroupedRequests[groupKey];
+            const group = globalGroupedData[groupKey];
             if (!group) return;
 
             closeDetailModal();
             stopNotificationSound();
 
+            const tableName = activeTab === 'request' ? 'stock_requests' : 'stock_returns';
+
             try {
                 for (const item of group.items) {
                     await supabaseAdmin
-                        .from('stock_requests')
+                        .from(tableName)
                         .update({ status: 'rejected' })
-                        .eq('id', item.reqId);
+                        .eq('id', item.itemId);
                 }
 
-                showNotifModal(`Permintaan stok dari ${group.salesName} berhasil DITOLAK.`);
-                await loadPendingRequests();
+                showNotifModal(`Pengajuan dari ${group.salesName} berhasil DITOLAK.`);
+                await loadActiveTabData();
             } catch (err) {
                 console.error('Error reject group:', err);
-                showNotifModal('Gagal menolak permintaan: ' + (err.message || 'Error server'));
+                showNotifModal('Gagal menolak pengajuan: ' + (err.message || 'Error server'));
             }
         }
 
@@ -523,7 +640,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAuth();
             await loadProducts();
-            await loadPendingRequests();
+            await loadActiveTabData();
 
             document.body.addEventListener('click', () => {
                 enableAudio();
@@ -537,27 +654,34 @@
                     async (payload) => {
                         console.log('Ada request stok baru:', payload);
                         startNotificationSound();
-
-                        let userName = 'Sales Partner';
-                        if (payload.new && payload.new.cart_unit_id) {
-                            const { data: cartData } = await supabaseAdmin
-                                .from('cart_units')
-                                .select('users(name)')
-                                .eq('id', payload.new.cart_unit_id)
-                                .maybeSingle();
-                            if (cartData?.users?.name) userName = cartData.users.name;
-                        }
-
-                        showNotifModal(`Ada permintaan stok baru masuk dari ${userName}!`);
-                        await loadPendingRequests();
+                        if (activeTab === 'request') await loadPendingRequests();
                     }
                 )
                 .on(
                     'postgres_changes',
                     { event: 'UPDATE', schema: 'public', table: 'stock_requests' },
-                    (payload) => {
-                        console.log('Ada perubahan status request stok:', payload);
-                        loadPendingRequests();
+                    async () => {
+                        if (activeTab === 'request') await loadPendingRequests();
+                    }
+                )
+                .subscribe();
+
+            supabaseAdmin
+                .channel('public:stock_returns')
+                .on(
+                    'postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'stock_returns' },
+                    async (payload) => {
+                        console.log('Ada pengembalian stok baru:', payload);
+                        startNotificationSound();
+                        if (activeTab === 'return') await loadPendingReturns();
+                    }
+                )
+                .on(
+                    'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'stock_returns' },
+                    async () => {
+                        if (activeTab === 'return') await loadPendingReturns();
                     }
                 )
                 .subscribe();
