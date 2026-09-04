@@ -1,111 +1,6 @@
-<!DOCTYPE html>
-<html lang="id">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Utama - Kopi Ajoe Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="css/theme.css">
-</head>
-
-<body class="bg-zinc-100 text-zinc-800">
-
-    <div class="flex h-screen overflow-hidden">
-
-        <!-- Container Sidebar Reusable -->
-        <div id="sidebar-container" class="shrink-0"></div>
-
-        <main class="flex-1 overflow-y-auto p-8">
-            <header class="flex justify-between items-center mb-8">
-                <div>
-                    <h2 class="text-2xl font-extrabold text-zinc-900">Monitoring Operasional Real-time</h2>
-                    <p class="text-xs text-zinc-500 mt-1">Pantau lokasi gerobak aktif dan performa penjualan hari ini.</p>
-                </div>
-                <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-zinc-200 shadow-sm">
-                    <span class="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping"></span>
-                    <span class="text-xs font-bold text-zinc-700">GPS Live Monitoring</span>
-                </div>
-            </header>
-
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
-                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
-                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Setoran Cash Hari Ini</p>
-                    <h3 id="statTodayCash" class="text-2xl font-extrabold text-zinc-900">Rp 0</h3>
-                    <p class="text-xs text-green-600 font-semibold mt-2">↑ Dari transaksi tunai</p>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
-                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Total Cup Terjual</p>
-                    <h3 id="statTodayCups" class="text-2xl font-extrabold text-zinc-900">0 Cup</h3>
-                    <p class="text-xs text-zinc-500 mt-2">Hari ini</p>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
-                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Gerobak Buka (GPS ON)</p>
-                    <h3 id="statOpenUnits" class="text-2xl font-extrabold text-zinc-900">0 Unit</h3>
-                    <p class="text-xs text-zinc-500 mt-2">Sedang keliling</p>
-                </div>
-
-                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
-                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Total Sales Registered</p>
-                    <h3 id="statTotalSales" class="text-2xl font-extrabold text-zinc-900">0 Sales</h3>
-                    <p class="text-xs text-zinc-500 mt-2">Terdaftar di cabang ini</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-extrabold text-zinc-900 text-sm">Peta Persebaran Gerobak (GPS Live)</h3>
-                        <span class="text-[10px] bg-zinc-100 px-3 py-1 rounded-lg font-bold text-zinc-600">OpenStreetMap</span>
-                    </div>
-                    <div id="map" class="w-full h-[400px] rounded-xl border border-zinc-200"></div>
-                </div>
-
-                <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 flex flex-col justify-between">
-                    <div>
-                        <h3 class="font-extrabold text-zinc-900 text-sm mb-4">Daftar Status Gerobak</h3>
-                        <div id="cartUnitsList" class="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-                            <p class="text-xs text-zinc-400 text-center py-8">Memuat data gerobak...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-
-    </div>
-
-    <!-- Modal Cek Stok Gerobak (Read-only) -->
-    <div id="stockModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[9999] p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div class="flex justify-between items-center border-b border-zinc-100 pb-3">
-                <div>
-                    <h4 id="stockModalSalesName" class="text-base font-extrabold text-zinc-900">Sisa Stok Gerobak</h4>
-                    <p id="stockModalUnitName" class="text-xs text-zinc-400">Unit Gerobak</p>
-                </div>
-                <button onclick="closeStockModal()" class="text-zinc-400 hover:text-black font-bold text-lg">&times;</button>
-            </div>
-
-            <div class="max-h-64 overflow-y-auto divide-y divide-zinc-100" id="stockItemsList">
-                <p class="text-xs text-zinc-400 text-center py-6">Memuat sisa stok...</p>
-            </div>
-
-            <div class="pt-2">
-                <button onclick="closeStockModal()" class="w-full bg-black text-white font-bold py-2.5 rounded-xl text-xs hover:bg-zinc-800 transition">
-                    Tutup
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script src="js/supabase.js"></script>
-    <script type="module">
-        import { renderSidebar } from './components/sidebar.ts';
-
+<script src="js/supabase.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
         let map;
         let markers = {};
         let currentAdminUser = null;
@@ -136,7 +31,7 @@
             const city = adminProfile?.city;
             const locationText = (!branch || !city || branch === 'ALL' || city === 'ALL') ? 'Super Admin' : `${branch} - ${city}`;
 
-            // Render Sidebar Modular
+            // Render Sidebar
             renderSidebar('dashboard', 'sidebar-container', {
                 name: adminProfile?.name || session.user.email.split('@')[0],
                 role: locationText
@@ -286,7 +181,7 @@
             }
         }
 
-        window.openStockModal = async function(cartUnitId, salesName, unitName) {
+        async function openStockModal(cartUnitId, salesName, unitName) {
             document.getElementById('stockModalSalesName').innerText = `Stok Gerobak: ${salesName}`;
             document.getElementById('stockModalUnitName').innerText = unitName;
 
@@ -340,7 +235,7 @@
             }
         }
 
-        window.closeStockModal = function() {
+        function closeStockModal() {
             const modal = document.getElementById('stockModal');
             modal.classList.remove('flex');
             modal.classList.add('hidden');
@@ -358,6 +253,3 @@
             }, 10000);
         });
     </script>
-</body>
-
-</html>
