@@ -123,9 +123,8 @@
     </div>
 
     <script src="js/supabase.js"></script>
-    <script type="module">
-        import { renderSidebar } from './components/sidebar.ts';
-
+    <script src="js/sidebar.js"></script>
+    <script>
         let currentFilter = 'daily';
         let rawTransactionsData = [];
         let usersMap = {};
@@ -177,7 +176,7 @@
             });
         }
 
-        window.setFilter = function(type) {
+        function setFilter(type) {
             currentFilter = type;
 
             document.getElementById('btnDaily').className = `px-3 py-1.5 text-xs font-bold rounded-lg transition ${type === 'daily' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
@@ -268,7 +267,7 @@
             });
         }
 
-        window.renderReportTable = function() {
+        function renderReportTable() {
             const tableBody = document.getElementById('reportTable');
             tableBody.innerHTML = '';
 
@@ -346,7 +345,7 @@
             document.getElementById('statTotalRoti').innerText = `${grandTotalRoti} Pcs`;
         }
 
-        window.exportToExcel = function() {
+        function exportToExcel() {
             const filteredData = getFilteredTransactions();
             if (filteredData.length === 0) {
                 alert('Tidak ada data transaksi untuk diexport!');
@@ -413,7 +412,7 @@
             XLSX.writeFile(workbook, `Laporan_Penjualan_Kopi_Ajoe_${currentFilter}.xlsx`);
         }
 
-        window.exportToPDF = function() {
+        function exportToPDF() {
             const filteredData = getFilteredTransactions();
             if (filteredData.length === 0) {
                 alert('Tidak ada data transaksi untuk diexport!');

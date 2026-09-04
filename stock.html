@@ -131,16 +131,15 @@
     </div>
 
     <script src="js/supabase.js"></script>
-    <script type="module">
-        import { renderSidebar } from './components/sidebar.ts';
-
+    <script src="js/sidebar.js"></script>
+    <script>
         const notifAudio = new Audio('sounds/notif.mp3');
         notifAudio.loop = true;
 
         let activeTab = 'request';
         let globalGroupedData = {};
 
-        window.enableAudio = function() {
+        function enableAudio() {
             notifAudio.play().then(() => {
                 notifAudio.pause();
                 notifAudio.currentTime = 0;
@@ -172,19 +171,19 @@
             modal.classList.add('flex');
         }
 
-        window.closeNotifModal = function() {
+        function closeNotifModal() {
             const modal = document.getElementById('notifModal');
             modal.classList.remove('flex');
             modal.classList.add('hidden');
         }
 
-        window.closeDetailModal = function() {
+        function closeDetailModal() {
             const modal = document.getElementById('detailModal');
             modal.classList.remove('flex');
             modal.classList.add('hidden');
         }
 
-        window.switchTab = function(tabName) {
+        function switchTab(tabName) {
             activeTab = tabName;
             const reqBtn = document.getElementById('tabRequestBtn');
             const retBtn = document.getElementById('tabReturnBtn');
@@ -200,7 +199,7 @@
             loadActiveTabData();
         }
 
-        window.loadActiveTabData = function() {
+        function loadActiveTabData() {
             if (activeTab === 'request') {
                 loadPendingRequests();
             } else {
@@ -273,7 +272,7 @@
             }
         }
 
-        window.handleBatchUpdateStock = async function() {
+        async function handleBatchUpdateStock() {
             const inputs = document.querySelectorAll('.batch-stock-input');
             const updates = [];
 
@@ -463,7 +462,7 @@
             tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-500 font-bold">${message}</td></tr>`;
         }
 
-        window.openDetailModal = function(groupKey) {
+        function openDetailModal(groupKey) {
             const group = globalGroupedData[groupKey];
             if (!group) return;
 
@@ -499,7 +498,7 @@
             modal.classList.add('flex');
         }
 
-        window.handleGroupApprove = async function(groupKey) {
+        async function handleGroupApprove(groupKey) {
             const group = globalGroupedData[groupKey];
             if (!group) return;
 
@@ -593,7 +592,7 @@
             }
         }
 
-        window.handleGroupReject = async function(groupKey) {
+        async function handleGroupReject(groupKey) {
             const group = globalGroupedData[groupKey];
             if (!group) return;
 
