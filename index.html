@@ -17,7 +17,31 @@
     <div class="flex h-screen overflow-hidden">
 
         <!-- Container Sidebar Reusable -->
-        <div id="sidebar-container" class="shrink-0"></div>
+        <aside class="w-64 bg-black text-white flex flex-col justify-between p-5 h-screen shrink-0">
+    <div>
+        <div class="mb-8 flex items-center gap-3">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">
+                KA
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
+                <p class="text-xs text-zinc-400">Admin Control Panel</p>
+            </div>
+        </div>
+
+        <nav id="sidebarNav" class="space-y-2">
+            <!-- Tempat menu di-update dinamis oleh JS -->
+        </nav>
+    </div>
+
+    <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
+        <div>
+            <p id="sidebarUserName" class="text-xs font-bold text-white">Admin</p>
+            <p id="sidebarUserRole" class="text-[10px] text-zinc-500">Super Admin</p>
+        </div>
+        <button id="sidebarLogoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
+    </div>
+</aside>
 
         <main class="flex-1 overflow-y-auto p-8">
             <header class="flex justify-between items-center mb-8">
@@ -135,8 +159,7 @@
             const city = adminProfile?.city;
             const locationText = (!branch || !city || branch === 'ALL' || city === 'ALL') ? 'Super Admin' : `${branch} - ${city}`;
 
-            // Render Sidebar Modular
-            renderSidebar('dashboard', 'sidebar-container', {
+            renderSidebar('dashboard', {
                 name: adminProfile?.name || session.user.email.split('@')[0],
                 role: locationText
             }, async () => {
