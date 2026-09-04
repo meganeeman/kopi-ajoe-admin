@@ -15,37 +15,8 @@
 
     <div class="flex h-screen overflow-hidden">
 
-        <aside class="w-64 bg-black text-white flex flex-col justify-between p-5 shrink-0">
-            <div>
-                <div class="mb-8 flex items-center gap-3">
-                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">KA</div>
-                    <div>
-                        <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
-                        <p class="text-xs text-zinc-400">Admin Control Panel</p>
-                    </div>
-                </div>
-
-                <nav class="space-y-2">
-                    <a href="index.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
-                        <span>📊</span> Dashboard Utama
-                    </a>
-                    <a href="stock.html" class="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-xl font-semibold text-sm transition">
-                        <span>📦</span> Manajemen Stok
-                    </a>
-                    <a href="report.html" class="flex items-center gap-3 px-4 py-3 sidebar-item-active rounded-xl font-bold text-sm">
-                        <span>📈</span> Laporan Penjualan
-                    </a>
-                </nav>
-            </div>
-
-            <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
-                <div>
-                    <p id="adminName" class="text-xs font-bold text-white">Admin</p>
-                    <p id="adminRole" class="text-[10px] text-zinc-500">Super Admin</p>
-                </div>
-                <button id="logoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
-            </div>
-        </aside>
+        <!-- Container Sidebar Reusable -->
+        <div id="sidebar-container" class="shrink-0"></div>
 
         <main class="flex-1 overflow-y-auto p-8">
             <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -152,7 +123,9 @@
     </div>
 
     <script src="js/supabase.js"></script>
-    <script>
+    <script type="module">
+        import { renderSidebar } from './components/sidebar.ts';
+
         let currentFilter = 'daily';
         let rawTransactionsData = [];
         let usersMap = {};
@@ -177,18 +150,16 @@
                 window.location.href = 'login.html';
                 return;
             }
-            document.getElementById('adminName').innerText = session.user.email.split('@')[0];
 
             const { data: userData } = await supabaseAdmin
                 .from('users')
-                .select('role, branch')
+                .select('name, role, branch')
                 .eq('email', session.user.email)
                 .maybeSingle();
 
             if (userData) {
                 currentUserRole = userData.role || 'super_admin';
                 currentUserBranch = userData.branch || 'ALL';
-                document.getElementById('adminRole').innerText = currentUserRole.toUpperCase();
 
                 if (currentUserRole !== 'super_admin' && currentUserBranch !== 'ALL') {
                     const branchSelect = document.getElementById('branchSelectFilter');
@@ -196,9 +167,17 @@
                     branchSelect.disabled = true;
                 }
             }
+
+            renderSidebar('reports', 'sidebar-container', {
+                name: userData?.name || session.user.email.split('@')[0],
+                role: currentUserRole.toUpperCase()
+            }, async () => {
+                await supabaseAdmin.auth.signOut();
+                window.location.href = 'login.html';
+            });
         }
 
-        function setFilter(type) {
+        window.setFilter = function(type) {
             currentFilter = type;
 
             document.getElementById('btnDaily').className = `px-3 py-1.5 text-xs font-bold rounded-lg transition ${type === 'daily' ? 'bg-black text-white' : 'text-zinc-500 hover:text-black'}`;
@@ -289,7 +268,7 @@
             });
         }
 
-        function renderReportTable() {
+        window.renderReportTable = function() {
             const tableBody = document.getElementById('reportTable');
             tableBody.innerHTML = '';
 
@@ -367,7 +346,7 @@
             document.getElementById('statTotalRoti').innerText = `${grandTotalRoti} Pcs`;
         }
 
-        function exportToExcel() {
+        window.exportToExcel = function() {
             const filteredData = getFilteredTransactions();
             if (filteredData.length === 0) {
                 alert('Tidak ada data transaksi untuk diexport!');
@@ -418,7 +397,6 @@
                 };
             });
 
-            // Tambahkan baris total di paling bawah
             exportRows.push({
                 'Waktu Transaksi': 'TOTAL KESELURUHAN',
                 'Cabang': '',
@@ -435,7 +413,7 @@
             XLSX.writeFile(workbook, `Laporan_Penjualan_Kopi_Ajoe_${currentFilter}.xlsx`);
         }
 
-        function exportToPDF() {
+        window.exportToPDF = function() {
             const filteredData = getFilteredTransactions();
             if (filteredData.length === 0) {
                 alert('Tidak ada data transaksi untuk diexport!');
@@ -494,7 +472,6 @@
                 ];
             });
 
-            // Footer total untuk PDF
             const footRow = [
                 'TOTAL',
                 '',
@@ -517,11 +494,6 @@
 
             doc.save(`Laporan_Penjualan_Kopi_Ajoe_${currentFilter}.pdf`);
         }
-
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-            await supabaseAdmin.auth.signOut();
-            window.location.href = 'login.html';
-        });
 
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAuth();
