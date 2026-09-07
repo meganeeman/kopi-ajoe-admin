@@ -168,7 +168,7 @@
             if(typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
                 formattedStr = dateString.replace(' ', 'T') + 'Z';
             }
-            const d = new Date(dateString);
+            const d = new Date(formattedStr);
             const dateStr = d.toLocaleDateString('id-ID', {
                 timeZone: 'Asia/Jakarta',
                 day: '2-digit',
