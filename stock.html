@@ -162,6 +162,22 @@
         let activeTab = 'request';
         let globalGroupedData = {};
 
+        function formatIndonesianDateTime(dateString) {
+            if (!dateString) return '-';
+            const d = new Date(dateString);
+            const dateStr = d.toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            const timeStr = d.toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).replace(':', '.');
+            return `${dateStr}, ${timeStr} WIB`;
+        }
+
         function enableAudio() {
             notifAudio.play().then(() => {
                 notifAudio.pause();
@@ -451,7 +467,7 @@
 
             Object.keys(globalGroupedData).forEach(groupKey => {
                 const group = globalGroupedData[groupKey];
-                const dateStr = new Date(group.latestTime).toLocaleString('id-ID');
+                const dateStr = formatIndonesianDateTime(group.latestTime);
                 const isPending = group.status === 'pending';
 
                 let statusBadge = `<span class="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-1 rounded-md text-[10px]">PENDING</span>`;
@@ -460,7 +476,7 @@
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
+                    <td class="py-3.5 px-2 text-zinc-500 font-medium">${dateStr}</td>
                     <td class="py-3.5 px-2 font-bold text-zinc-900">${group.salesName}</td>
                     <td class="py-3.5 px-2 text-center font-extrabold text-black">${group.items.length} Macam (${group.totalQuantity} Cup)</td>
                     <td class="py-3.5 px-2">${statusBadge}</td>
@@ -491,7 +507,7 @@
 
             const titlePrefix = activeTab === 'request' ? 'Request' : 'Pengembalian';
             document.getElementById('modalSalesName').innerText = `${titlePrefix} dari: ${group.salesName}`;
-            document.getElementById('modalTime').innerText = `Waktu: ${new Date(group.latestTime).toLocaleString('id-ID')}`;
+            document.getElementById('modalTime').innerText = `Waktu: ${formatIndonesianDateTime(group.latestTime)}`;
 
             const listContainer = document.getElementById('detailItemsList');
             listContainer.innerHTML = '';

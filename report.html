@@ -162,6 +162,22 @@
             'PDG': 'Padang'
         };
 
+        function formatIndonesianDateTime(dateString) {
+            if (!dateString) return '-';
+            const d = new Date(dateString);
+            const dateStr = d.toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            const timeStr = d.toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).replace(':', '.');
+            return `${dateStr}, ${timeStr} WIB`;
+        }
+
         function getBranchLabel(code) {
             return BRANCH_NAMES[code] || code || 'Cabang';
         }
@@ -343,11 +359,11 @@
                 const salesName = salesObj ? salesObj.name : 'Sales Partner';
                 const txBranchCode = t.branch || (salesObj ? salesObj.branch : 'PYK');
                 const branchLabel = getBranchLabel(txBranchCode);
-                const dateStr = new Date(t.created_at).toLocaleString('id-ID');
+                const dateStr = formatIndonesianDateTime(t.created_at);
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="py-3.5 px-2 text-zinc-500">${dateStr}</td>
+                    <td class="py-3.5 px-2 text-zinc-500 font-medium">${dateStr}</td>
                     <td class="py-3.5 px-2 font-bold text-zinc-700">${branchLabel}</td>
                     <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
                     <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowCups} Cup</td>
@@ -409,7 +425,7 @@
                 grandTotalRevenue += price;
 
                 return {
-                    'Waktu Transaksi': new Date(t.created_at).toLocaleString('id-ID'),
+                    'Waktu Transaksi': formatIndonesianDateTime(t.created_at),
                     'Cabang': getBranchLabel(t.branch || (salesObj ? salesObj.branch : 'PYK')),
                     'Nama Sales': salesObj ? salesObj.name : 'Sales Partner',
                     'Jumlah Cup': rowCups,
@@ -448,7 +464,7 @@
             doc.setFontSize(16);
             doc.text('Laporan Penjualan Kopi Ajoe', 14, 15);
             doc.setFontSize(10);
-            doc.text(`Periode: ${currentFilter.toUpperCase()} | Dicetak: ${new Date().toLocaleString('id-ID')}`, 14, 22);
+            doc.text(`Periode: ${currentFilter.toUpperCase()} | Dicetak: ${formatIndonesianDateTime(new Date().toISOString())}`, 14, 22);
 
             let grandTotalCups = 0;
             let grandTotalRoti = 0;
@@ -484,7 +500,7 @@
                 grandTotalRevenue += price;
 
                 return [
-                    new Date(t.created_at).toLocaleString('id-ID'),
+                    formatIndonesianDateTime(t.created_at),
                     getBranchLabel(t.branch || (salesObj ? salesObj.branch : 'PYK')),
                     salesObj ? salesObj.name : 'Sales Partner',
                     `${rowCups} Cup`,
