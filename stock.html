@@ -67,7 +67,7 @@
                                 <th class="py-2.5 px-2">Kategori</th>
                                 <th class="py-2.5 px-2">Nama Produk</th>
                                 <th class="py-2.5 px-2 text-center">Stok Gudang Saat Ini</th>
-                                <th class="py-2.5 px-2 text-right">Tambah Pasokan Baru (Cup)</th>
+                                <th class="py-2.5 px-2 text-right">Tambah Pasokan Baru</th>
                             </tr>
                         </thead>
                         <tbody id="factoryStockTable" class="text-xs divide-y divide-zinc-50 font-medium text-zinc-700">
@@ -161,6 +161,13 @@
 
         let activeTab = 'request';
         let globalGroupedData = {};
+
+        function getUnitLabel(category) {
+            if (!category) return 'Cup';
+            const catLower = category.toLowerCase();
+            if (catLower === 'food') return 'Pcs';
+            return 'Cup';
+        }
 
         function formatIndonesianDateTime(dateString) {
             if (!dateString) return '-';
@@ -276,6 +283,7 @@
                         id,
                         name,
                         category,
+                        is_bundle,
                         inventory ( stock )
                     `)
                     .order('name');
@@ -285,14 +293,18 @@
                 const tableBody = document.getElementById('factoryStockTable');
                 tableBody.innerHTML = '';
 
-                products.forEach(p => {
+                // Filter out bundle items
+                const singleProducts = (products || []).filter(p => !p.is_bundle && p.category !== 'Bundle Promo');
+
+                singleProducts.forEach(p => {
                     const stockQty = Array.isArray(p.inventory) ? (p.inventory[0]?.stock || 0) : (p.inventory?.stock || 0);
+                    const unitLabel = getUnitLabel(p.category);
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td class="py-3 px-2 font-bold text-zinc-400">${p.category || 'COFFEE'}</td>
                         <td class="py-3 px-2 font-bold text-zinc-900">${p.name}</td>
-                        <td class="py-3 px-2 text-center font-extrabold text-black">${stockQty} Cup</td>
+                        <td class="py-3 px-2 text-center font-extrabold text-black">${stockQty} ${unitLabel}</td>
                         <td class="py-3 px-2 text-right">
                             <input 
                                 type="number" 
@@ -379,7 +391,7 @@
                         created_at,
                         product_id,
                         cart_unit_id,
-                        products ( name ),
+                        products ( name, category, is_bundle ),
                         cart_units (
                             active_sales_id,
                             users ( name )
@@ -407,7 +419,7 @@
                         created_at,
                         product_id,
                         cart_unit_id,
-                        products ( name ),
+                        products ( name, category, is_bundle ),
                         cart_units (
                             active_sales_id,
                             users ( name )
@@ -428,7 +440,10 @@
             const tableBody = document.getElementById('requestsTable');
             tableBody.innerHTML = '';
 
-            if (!dataItems || dataItems.length === 0) {
+            // Exclude bundles from requests/returns
+            const filteredItems = (dataItems || []).filter(item => !item.products?.is_bundle && item.products?.category !== 'Bundle Promo');
+
+            if (!filteredItems || filteredItems.length === 0) {
                 const label = type === 'request' ? 'permintaan' : 'pengembalian';
                 tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-zinc-400">Belum ada ${label} stok dari sales.</td></tr>`;
                 stopNotificationSound();
@@ -438,7 +453,7 @@
             globalGroupedData = {};
             let hasPendingGlobal = false;
 
-            dataItems.forEach(item => {
+            filteredItems.forEach(item => {
                 const salesName = item.cart_units?.users?.name || 'Sales Partner';
                 const cartUnitId = item.cart_unit_id || 'unknown';
                 const key = `${cartUnitId}_${item.status}`;
@@ -461,6 +476,7 @@
                     itemId: item.id,
                     productId: item.product_id,
                     productName: item.products?.name || 'Produk',
+                    category: item.products?.category || '',
                     quantity: item.quantity
                 });
             });
@@ -478,7 +494,7 @@
                 tr.innerHTML = `
                     <td class="py-3.5 px-2 text-zinc-500 font-medium">${dateStr}</td>
                     <td class="py-3.5 px-2 font-bold text-zinc-900">${group.salesName}</td>
-                    <td class="py-3.5 px-2 text-center font-extrabold text-black">${group.items.length} Macam (${group.totalQuantity} Cup)</td>
+                    <td class="py-3.5 px-2 text-center font-extrabold text-black">${group.items.length} Macam (${group.totalQuantity} Item)</td>
                     <td class="py-3.5 px-2">${statusBadge}</td>
                     <td class="py-3.5 px-2 text-right space-x-2">
                         <button onclick="openDetailModal('${groupKey}')" class="bg-zinc-100 text-zinc-800 px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-200 transition text-xs">Detail Items</button>
@@ -513,11 +529,12 @@
             listContainer.innerHTML = '';
 
             group.items.forEach(item => {
+                const unitLabel = getUnitLabel(item.category);
                 const div = document.createElement('div');
                 div.className = 'py-2 flex justify-between items-center text-xs';
                 div.innerHTML = `
                     <span class="font-bold text-zinc-800">${item.productName}</span>
-                    <span class="font-extrabold text-black">${item.quantity} Cup</span>
+                    <span class="font-extrabold text-black">${item.quantity} ${unitLabel}</span>
                 `;
                 listContainer.appendChild(div);
             });
