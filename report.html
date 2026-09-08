@@ -269,7 +269,10 @@
 
                 const { data: usersData } = await supabaseAdmin
                     .from('users')
-                    .select('id, name, branch');
+                    .select('id, name, branch')
+                    .eq('role', 'sales')
+                    .neq('name', 'Test')
+                    .order('name', { ascending: true });
 
                 usersMap = {};
                 const salesSelect = document.getElementById('salesSelectFilter');
