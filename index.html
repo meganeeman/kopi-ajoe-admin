@@ -283,7 +283,8 @@
                             branch,
                             city
                         )
-                    `);
+                    `)
+                    .not('unit_name', 'ilike', '%test%');
 
                 if (selectedBranchFilter && selectedBranchFilter !== 'ALL') {
                     unitsQuery = unitsQuery.eq('users.branch', selectedBranchFilter);
