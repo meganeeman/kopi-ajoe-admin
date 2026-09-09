@@ -16,32 +16,30 @@
 
     <div class="flex h-screen overflow-hidden">
 
-        <!-- Container Sidebar Reusable -->
         <aside class="w-64 bg-black text-white flex flex-col justify-between p-5 h-screen shrink-0">
-    <div>
-        <div class="mb-8 flex items-center gap-3">
-            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">
-                KA
-            </div>
             <div>
-                <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
-                <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">
+                        KA
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
+                        <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                    </div>
+                </div>
+
+                <nav id="sidebarNav" class="space-y-2">
+                </nav>
             </div>
-        </div>
 
-        <nav id="sidebarNav" class="space-y-2">
-            <!-- Tempat menu di-update dinamis oleh JS -->
-        </nav>
-    </div>
-
-    <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
-        <div>
-            <p id="sidebarUserName" class="text-xs font-bold text-white">Admin</p>
-            <p id="sidebarUserRole" class="text-[10px] text-zinc-500">Super Admin</p>
-        </div>
-        <button id="sidebarLogoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
-    </div>
-</aside>
+            <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
+                <div>
+                    <p id="sidebarUserName" class="text-xs font-bold text-white">Admin</p>
+                    <p id="sidebarUserRole" class="text-[10px] text-zinc-500">Super Admin</p>
+                </div>
+                <button id="sidebarLogoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
+            </div>
+        </aside>
 
         <main class="flex-1 overflow-y-auto p-8">
             <header class="flex justify-between items-center mb-8">
@@ -49,9 +47,16 @@
                     <h2 class="text-2xl font-extrabold text-zinc-900">Monitoring Operasional Real-time</h2>
                     <p class="text-xs text-zinc-500 mt-1">Pantau lokasi gerobak aktif dan performa penjualan hari ini.</p>
                 </div>
-                <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-zinc-200 shadow-sm">
-                    <span class="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping"></span>
-                    <span class="text-xs font-bold text-zinc-700">GPS Live Monitoring</span>
+                <div class="flex items-center gap-3">
+                    <div id="branchFilterContainer" class="hidden">
+                        <select id="branchSelect" onchange="handleBranchChange()" class="bg-white px-3 py-2 rounded-xl border border-zinc-200 shadow-sm text-xs font-bold text-zinc-700 outline-none cursor-pointer">
+                            <option value="ALL">Semua Cabang (ALL)</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-zinc-200 shadow-sm">
+                        <span class="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping"></span>
+                        <span class="text-xs font-bold text-zinc-700">GPS Live Monitoring</span>
+                    </div>
                 </div>
             </header>
 
@@ -77,7 +82,7 @@
                 <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
                     <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Total Sales Registered</p>
                     <h3 id="statTotalSales" class="text-2xl font-extrabold text-zinc-900">0 Sales</h3>
-                    <p class="text-xs text-zinc-500 mt-2">Terdaftar di cabang ini</p>
+                    <p id="statSalesSubtext" class="text-xs text-zinc-500 mt-2">Terdaftar di sistem</p>
                 </div>
             </div>
 
@@ -103,7 +108,6 @@
 
     </div>
 
-    <!-- Modal Cek Stok Gerobak (Read-only) -->
     <div id="stockModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[9999] p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-zinc-100 pb-3">
@@ -132,9 +136,11 @@
         let map;
         let markers = {};
         let currentAdminUser = null;
+        let selectedBranchFilter = 'ALL';
+        let branchCoordsMap = {};
 
         function initMap() {
-            map = L.map('map').setView([-0.2292, 100.6308], 13);
+            map = L.map('map').setView([-0.2292, 100.6308], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
@@ -157,7 +163,16 @@
             
             const branch = adminProfile?.branch;
             const city = adminProfile?.city;
-            const locationText = (!branch || !city || branch === 'ALL' || city === 'ALL') ? 'Super Admin' : `${branch} - ${city}`;
+            const isSuperAdmin = !branch || !city || branch === 'ALL' || city === 'ALL';
+            
+            selectedBranchFilter = isSuperAdmin ? 'ALL' : branch;
+
+            const locationText = isSuperAdmin ? 'Super Admin' : `${branch} - ${city}`;
+
+            if (isSuperAdmin) {
+                document.getElementById('branchFilterContainer').classList.remove('hidden');
+                await loadBranchOptions();
+            }
 
             renderSidebar('dashboard', {
                 name: adminProfile?.name || session.user.email.split('@')[0],
@@ -166,6 +181,45 @@
                 await supabaseAdmin.auth.signOut();
                 window.location.href = 'login.html';
             });
+        }
+
+        async function loadBranchOptions() {
+            try {
+                const { data: branches, error } = await supabaseAdmin
+                    .from('branches')
+                    .select('branch_name, city, latitude, longitude')
+                    .order('branch_name', { ascending: true });
+
+                if (error || !branches) return;
+
+                const select = document.getElementById('branchSelect');
+                branches.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.branch_name;
+                    opt.innerText = `${b.branch_name} (${b.city || 'Cabang'})`;
+                    select.appendChild(opt);
+
+                    if (b.latitude && b.longitude) {
+                        branchCoordsMap[b.branch_name] = [b.latitude, b.longitude];
+                    }
+                });
+            } catch (err) {
+                console.log('Error load branch options:', err);
+            }
+        }
+
+        async function handleBranchChange() {
+            const select = document.getElementById('branchSelect');
+            selectedBranchFilter = select.value;
+
+            if (selectedBranchFilter !== 'ALL' && branchCoordsMap[selectedBranchFilter]) {
+                map.flyTo(branchCoordsMap[selectedBranchFilter], 13);
+            } else {
+                map.flyTo([-0.2292, 100.6308], 11);
+            }
+
+            await fetchDashboardStats();
+            await fetchCartUnits();
         }
 
         async function fetchDashboardStats() {
@@ -197,11 +251,11 @@
                     .select('*', { count: 'exact', head: true })
                     .eq('role', 'sales');
 
-                if (currentAdminUser?.branch) {
-                    salesQuery = salesQuery.eq('branch', currentAdminUser.branch);
-                }
-                if (currentAdminUser?.city) {
-                    salesQuery = salesQuery.eq('city', currentAdminUser.city);
+                if (selectedBranchFilter && selectedBranchFilter !== 'ALL') {
+                    salesQuery = salesQuery.eq('branch', selectedBranchFilter);
+                    document.getElementById('statSalesSubtext').innerText = `Terdaftar di ${selectedBranchFilter}`;
+                } else {
+                    document.getElementById('statSalesSubtext').innerText = 'Terdaftar di seluruh cabang';
                 }
 
                 const { count: salesCount } = await salesQuery;
@@ -231,11 +285,8 @@
                         )
                     `);
 
-                if (currentAdminUser?.branch) {
-                    unitsQuery = unitsQuery.eq('users.branch', currentAdminUser.branch);
-                }
-                if (currentAdminUser?.city) {
-                    unitsQuery = unitsQuery.eq('users.city', currentAdminUser.city);
+                if (selectedBranchFilter && selectedBranchFilter !== 'ALL') {
+                    unitsQuery = unitsQuery.eq('users.branch', selectedBranchFilter);
                 }
 
                 const { data: units, error } = await unitsQuery;
