@@ -60,11 +60,17 @@
                 </div>
             </header>
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
                 <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
                     <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Setoran Cash Hari Ini</p>
                     <h3 id="statTodayCash" class="text-2xl font-extrabold text-zinc-900">Rp 0</h3>
-                    <p class="text-xs text-green-600 font-semibold mt-2">↑ Dari transaksi tunai</p>
+                    <p class="text-xs text-green-600 font-semibold mt-2">↑ Transaksi Tunai</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
+                    <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Total QRIS Hari Ini</p>
+                    <h3 id="statTodayQris" class="text-2xl font-extrabold text-zinc-900">Rp 0</h3>
+                    <p class="text-xs text-blue-600 font-semibold mt-2">📲 Transaksi Non-Tunai</p>
                 </div>
 
                 <div class="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm">
@@ -238,11 +244,17 @@
 
                 if (trans) {
                     const todayCash = trans
-                        .filter(t => t.payment_method === 'CASH')
+                        .filter(t => (t.payment_method || 'CASH').toUpperCase() === 'CASH')
                         .reduce((sum, t) => sum + (t.total_price || 0), 0);
+
+                    const todayQris = trans
+                        .filter(t => (t.payment_method || '').toUpperCase() === 'QRIS')
+                        .reduce((sum, t) => sum + (t.total_price || 0), 0);
+
                     const totalCups = trans.reduce((sum, t) => sum + (t.total_cups || 0), 0);
 
                     document.getElementById('statTodayCash').innerText = `Rp ${todayCash.toLocaleString('id-ID')}`;
+                    document.getElementById('statTodayQris').innerText = `Rp ${todayQris.toLocaleString('id-ID')}`;
                     document.getElementById('statTodayCups').innerText = `${totalCups} Cup`;
                 }
 
@@ -397,6 +409,11 @@
                     const category = item.products?.category || 'Kategori';
                     const qty = item.quantity || 0;
 
+                    const catUpper = category.toUpperCase();
+                    const nameUpper = prodName.toUpperCase();
+                    const isRoti = catUpper === 'FOOD' || catUpper === 'ROTI' || nameUpper.includes('ROTI');
+                    const unitLabel = isRoti ? 'Pcs' : 'Cup';
+
                     const div = document.createElement('div');
                     div.className = 'py-2.5 flex justify-between items-center text-xs';
                     div.innerHTML = `
@@ -404,7 +421,7 @@
                             <p class="font-bold text-zinc-800">${prodName}</p>
                             <p class="text-[10px] text-zinc-400 font-semibold">${category}</p>
                         </div>
-                        <span class="font-extrabold text-black bg-zinc-100 px-2.5 py-1 rounded-md ${qty === 0 ? 'text-red-500' : ''}">${qty} Cup</span>
+                        <span class="font-extrabold text-black bg-zinc-100 px-2.5 py-1 rounded-md ${qty === 0 ? 'text-red-500' : ''}">${qty} ${unitLabel}</span>
                     `;
                     listContainer.appendChild(div);
                 });

@@ -16,30 +16,29 @@
     <div class="flex h-screen overflow-hidden">
 
         <aside class="w-64 bg-black text-white flex flex-col justify-between p-5 h-screen shrink-0">
-    <div>
-        <div class="mb-8 flex items-center gap-3">
-            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">
-                KA
-            </div>
             <div>
-                <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
-                <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">
+                        KA
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
+                        <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                    </div>
+                </div>
+
+                <nav id="sidebarNav" class="space-y-2">
+                </nav>
             </div>
-        </div>
 
-        <nav id="sidebarNav" class="space-y-2">
-            <!-- Tempat menu di-update dinamis oleh JS -->
-        </nav>
-    </div>
-
-    <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
-        <div>
-            <p id="sidebarUserName" class="text-xs font-bold text-white">Admin</p>
-            <p id="sidebarUserRole" class="text-[10px] text-zinc-500">Super Admin</p>
-        </div>
-        <button id="sidebarLogoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
-    </div>
-</aside>
+            <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
+                <div>
+                    <p id="sidebarUserName" class="text-xs font-bold text-white">Admin</p>
+                    <p id="sidebarUserRole" class="text-[10px] text-zinc-500">Super Admin</p>
+                </div>
+                <button id="sidebarLogoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
+            </div>
+        </aside>
 
         <main class="flex-1 overflow-y-auto p-8">
             <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -90,6 +89,18 @@
                 </div>
             </div>
 
+            <div id="salesSummarySection" class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-8">
+                <div class="flex justify-between items-center mb-4 border-b border-zinc-100 pb-3">
+                    <div>
+                        <h3 class="font-extrabold text-zinc-900 text-base">Ringkasan Omzet Per Sales</h3>
+                        <p class="text-xs text-zinc-500">Akumulasi total penjualan masing-masing sales pada periode terpilih.</p>
+                    </div>
+                </div>
+                <div id="salesSummaryGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto pr-1">
+                    <p class="text-xs text-zinc-400 col-span-full py-4 text-center">Memuat ringkasan sales...</p>
+                </div>
+            </div>
+
             <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
                     <div>
@@ -102,7 +113,7 @@
                             <option value="">-- Semua Cabang --</option>
                             <option value="PYK">Payakumbuh (PYK)</option>
                             <option value="BKT">Bukittinggi (BKT)</option>
-                            <option value="SOL">Solok (SOL)</option>
+                            <option value="SLK">Solok (SLK)</option>
                             <option value="PDG">Padang (PDG)</option>
                         </select>
 
@@ -127,8 +138,8 @@
                                 <th class="py-3 px-2">Waktu Transaksi</th>
                                 <th class="py-3 px-2">Cabang</th>
                                 <th class="py-3 px-2">Nama Sales</th>
-                                <th class="py-3 px-2 text-center">Jumlah Cup</th>
-                                <th class="py-3 px-2 text-center">Jumlah Roti</th>
+                                <th class="py-3 px-2">Rincian Barang</th>
+                                <th class="py-3 px-2 text-center">Volume</th>
                                 <th class="py-3 px-2">Metode Pembayaran</th>
                                 <th class="py-3 px-2 text-right">Total Transaksi</th>
                             </tr>
@@ -158,7 +169,7 @@
             'ALL': 'Semua Cabang',
             'PYK': 'Payakumbuh',
             'BKT': 'Bukittinggi',
-            'SOL': 'Solok',
+            'SLK': 'Solok',
             'PDG': 'Padang'
         };
 
@@ -202,7 +213,7 @@
                 .maybeSingle();
 
             if (userData) {
-                currentUserRole = userData.role || 'super_admin';
+                currentUserRole = userData.role || 'admin';
                 currentUserBranch = userData.branch || 'ALL';
 
                 if (currentUserRole !== 'super_admin' && currentUserBranch !== 'ALL') {
@@ -212,9 +223,12 @@
                 }
             }
 
+            const isSuperAdmin = !userData?.branch || userData?.branch === 'ALL' || userData?.role === 'super_admin' || userData?.role === 'admin';
+            const displayRole = isSuperAdmin ? 'Super Admin' : `Admin ${userData?.branch || ''}`;
+
             renderSidebar('reports', {
                 name: userData?.name || session.user.email.split('@')[0],
-                role: currentUserRole.toUpperCase()
+                role: displayRole
             }, async () => {
                 await supabaseAdmin.auth.signOut();
                 window.location.href = 'login.html';
@@ -317,7 +331,9 @@
 
         function renderReportTable() {
             const tableBody = document.getElementById('reportTable');
+            const summaryGrid = document.getElementById('salesSummaryGrid');
             tableBody.innerHTML = '';
+            summaryGrid.innerHTML = '';
 
             const filteredData = getFilteredTransactions();
 
@@ -327,6 +343,7 @@
                 document.getElementById('statTotalCups').innerText = '0 Cup';
                 document.getElementById('statTotalRoti').innerText = '0 Pcs';
 
+                summaryGrid.innerHTML = `<p class="text-xs text-zinc-400 col-span-full py-4 text-center">Tidak ada data sales pada periode terpilih.</p>`;
                 tableBody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-zinc-400">Tidak ada data transaksi yang cocok dengan filter.</td></tr>`;
                 return;
             }
@@ -334,12 +351,14 @@
             let totalRev = 0;
             let grandTotalCups = 0;
             let grandTotalRoti = 0;
+            const salesAggMap = {};
 
             filteredData.forEach(t => {
                 totalRev += (t.total_price || 0);
 
                 let rowCups = 0;
                 let rowRoti = 0;
+                let itemsSummaryArr = [];
 
                 let parsedItems = t.items;
                 if (typeof parsedItems === 'string') {
@@ -348,7 +367,8 @@
 
                 if (Array.isArray(parsedItems) && parsedItems.length > 0) {
                     parsedItems.forEach(item => {
-                        const cat = (item.category || item.name || '').toLowerCase();
+                        const name = item.name || item.product_name || 'Produk';
+                        const cat = (item.category || name || '').toLowerCase();
                         const qty = parseInt(item.quantity || item.qty || 1);
 
                         if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
@@ -356,16 +376,38 @@
                         } else {
                             rowCups += qty;
                         }
+
+                        itemsSummaryArr.push(`${name} (x${qty})`);
                     });
                 } else {
                     rowCups = t.total_cups || 0;
+                    itemsSummaryArr.push(`Minuman (x${rowCups})`);
                 }
+
+                const itemDetailsStr = itemsSummaryArr.join(', ');
 
                 grandTotalCups += rowCups;
                 grandTotalRoti += rowRoti;
 
                 const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
                 const salesName = salesObj ? salesObj.name : 'Sales Partner';
+                const sId = t.sales_id || 'unknown';
+
+                if (!salesAggMap[sId]) {
+                    salesAggMap[sId] = {
+                        name: salesName,
+                        txCount: 0,
+                        totalCups: 0,
+                        totalRoti: 0,
+                        totalRevenue: 0
+                    };
+                }
+
+                salesAggMap[sId].txCount += 1;
+                salesAggMap[sId].totalCups += rowCups;
+                salesAggMap[sId].totalRoti += rowRoti;
+                salesAggMap[sId].totalRevenue += (t.total_price || 0);
+
                 const txBranchCode = t.branch || (salesObj ? salesObj.branch : 'PYK');
                 const branchLabel = getBranchLabel(txBranchCode);
                 const dateStr = formatIndonesianDateTime(t.created_at);
@@ -375,8 +417,8 @@
                     <td class="py-3.5 px-2 text-zinc-500 font-medium">${dateStr}</td>
                     <td class="py-3.5 px-2 font-bold text-zinc-700">${branchLabel}</td>
                     <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
-                    <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowCups} Cup</td>
-                    <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowRoti} Pcs</td>
+                    <td class="py-3.5 px-2 text-zinc-800 font-semibold max-w-xs truncate" title="${itemDetailsStr}">${itemDetailsStr}</td>
+                    <td class="py-3.5 px-2 text-center font-extrabold text-black">${rowCups} Cup / ${rowRoti} Pcs</td>
                     <td class="py-3.5 px-2">
                         <span class="px-2.5 py-1 rounded-md text-[10px] font-bold ${t.payment_method === 'CASH' ? 'bg-zinc-200 text-zinc-800' : 'bg-blue-100 text-blue-800'}">
                             ${t.payment_method || 'CASH'}
@@ -385,6 +427,23 @@
                     <td class="py-3.5 px-2 text-right font-extrabold text-black">Rp ${(t.total_price || 0).toLocaleString('id-ID')}</td>
                 `;
                 tableBody.appendChild(tr);
+            });
+
+            Object.values(salesAggMap).forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'p-4 rounded-xl border border-zinc-100 bg-zinc-50 space-y-2';
+                card.innerHTML = `
+                    <p class="text-xs font-extrabold text-zinc-900 truncate">${s.name}</p>
+                    <div class="text-[11px] text-zinc-500 space-y-0.5">
+                        <div class="flex justify-between"><span>Transaksi:</span><b class="text-zinc-800">${s.txCount} tx</b></div>
+                        <div class="flex justify-between"><span>Total Vol:</span><b class="text-zinc-800">${s.totalCups} Cup / ${s.totalRoti} Pcs</b></div>
+                    </div>
+                    <div class="pt-2 border-t border-zinc-200/60 flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-zinc-400 uppercase">Omzet</span>
+                        <span class="text-xs font-extrabold text-black">Rp ${s.totalRevenue.toLocaleString('id-ID')}</span>
+                    </div>
+                `;
+                summaryGrid.appendChild(card);
             });
 
             document.getElementById('statTotalRevenue').innerText = `Rp ${totalRev.toLocaleString('id-ID')}`;
@@ -408,6 +467,7 @@
                 const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
                 let rowCups = 0;
                 let rowRoti = 0;
+                let itemsSummaryArr = [];
 
                 let parsedItems = t.items;
                 if (typeof parsedItems === 'string') {
@@ -416,16 +476,19 @@
 
                 if (Array.isArray(parsedItems) && parsedItems.length > 0) {
                     parsedItems.forEach(item => {
-                        const cat = (item.category || item.name || '').toLowerCase();
+                        const name = item.name || item.product_name || 'Produk';
+                        const cat = (item.category || name || '').toLowerCase();
                         const qty = parseInt(item.quantity || item.qty || 1);
                         if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
                             rowRoti += qty;
                         } else {
                             rowCups += qty;
                         }
+                        itemsSummaryArr.push(`${name} (x${qty})`);
                     });
                 } else {
                     rowCups = t.total_cups || 0;
+                    itemsSummaryArr.push(`Minuman (x${rowCups})`);
                 }
 
                 const price = t.total_price || 0;
@@ -437,6 +500,7 @@
                     'Waktu Transaksi': formatIndonesianDateTime(t.created_at),
                     'Cabang': getBranchLabel(t.branch || (salesObj ? salesObj.branch : 'PYK')),
                     'Nama Sales': salesObj ? salesObj.name : 'Sales Partner',
+                    'Rincian Barang': itemsSummaryArr.join(', '),
                     'Jumlah Cup': rowCups,
                     'Jumlah Roti': rowRoti,
                     'Metode Pembayaran': t.payment_method || 'CASH',
@@ -448,6 +512,7 @@
                 'Waktu Transaksi': 'TOTAL KESELURUHAN',
                 'Cabang': '',
                 'Nama Sales': `${filteredData.length} Transaksi`,
+                'Rincian Barang': '',
                 'Jumlah Cup': grandTotalCups,
                 'Jumlah Roti': grandTotalRoti,
                 'Metode Pembayaran': '',
@@ -483,6 +548,7 @@
                 const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
                 let rowCups = 0;
                 let rowRoti = 0;
+                let itemsSummaryArr = [];
 
                 let parsedItems = t.items;
                 if (typeof parsedItems === 'string') {
@@ -491,16 +557,19 @@
 
                 if (Array.isArray(parsedItems) && parsedItems.length > 0) {
                     parsedItems.forEach(item => {
-                        const cat = (item.category || item.name || '').toLowerCase();
+                        const name = item.name || item.product_name || 'Produk';
+                        const cat = (item.category || name || '').toLowerCase();
                         const qty = parseInt(item.quantity || item.qty || 1);
                         if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
                             rowRoti += qty;
                         } else {
                             rowCups += qty;
                         }
+                        itemsSummaryArr.push(`${name} (x${qty})`);
                     });
                 } else {
                     rowCups = t.total_cups || 0;
+                    itemsSummaryArr.push(`Minuman (x${rowCups})`);
                 }
 
                 const price = t.total_price || 0;
@@ -512,8 +581,8 @@
                     formatIndonesianDateTime(t.created_at),
                     getBranchLabel(t.branch || (salesObj ? salesObj.branch : 'PYK')),
                     salesObj ? salesObj.name : 'Sales Partner',
-                    `${rowCups} Cup`,
-                    `${rowRoti} Pcs`,
+                    itemsSummaryArr.join(', '),
+                    `${rowCups} Cup / ${rowRoti} Pcs`,
                     t.payment_method || 'CASH',
                     `Rp ${price.toLocaleString('id-ID')}`
                 ];
@@ -523,14 +592,14 @@
                 'TOTAL',
                 '',
                 `${filteredData.length} Transaksi`,
-                `${grandTotalCups} Cup`,
-                `${grandTotalRoti} Pcs`,
+                '',
+                `${grandTotalCups} Cup / ${grandTotalRoti} Pcs`,
                 '',
                 `Rp ${grandTotalRevenue.toLocaleString('id-ID')}`
             ];
 
             doc.autoTable({
-                head: [['Waktu', 'Cabang', 'Nama Sales', 'Jumlah Cup', 'Jumlah Roti', 'Metode', 'Total Transaksi']],
+                head: [['Waktu', 'Cabang', 'Nama Sales', 'Rincian Barang', 'Volume', 'Metode', 'Total Transaksi']],
                 body: tableRows,
                 foot: [footRow],
                 startY: 28,

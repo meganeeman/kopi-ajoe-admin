@@ -1,6 +1,16 @@
 import { ADMIN_MENU_ITEMS, MenuItem } from '../constants/navigation.ts';
 
-export function renderSidebar(activeMenuId: string, elementId: string = 'sidebar-container'): void {
+interface UserProfile {
+    name?: string;
+    role?: string;
+}
+
+export function renderSidebar(
+    activeMenuId: string, 
+    user?: UserProfile, 
+    onLogout?: () => void, 
+    elementId: string = 'sidebar-container'
+): void {
     const container = document.getElementById(elementId);
     if (!container) return;
 
@@ -15,6 +25,9 @@ export function renderSidebar(activeMenuId: string, elementId: string = 'sidebar
             </a>
         `;
     }).join('');
+
+    const userName = user?.name || 'Admin';
+    const userRole = user?.role || 'Super Admin';
 
     container.innerHTML = `
         <aside class="sidebar-wrapper">
@@ -32,11 +45,18 @@ export function renderSidebar(activeMenuId: string, elementId: string = 'sidebar
 
             <div class="sidebar-footer">
                 <div>
-                    <p class="user-name">Akbar Permana Erianto</p>
-                    <p class="user-role">Super Admin</p>
+                    <p class="user-name">${userName}</p>
+                    <p class="user-role">${userRole}</p>
                 </div>
                 <button id="btn-logout" class="btn-logout">Keluar</button>
             </div>
         </aside>
     `;
+
+    if (onLogout) {
+        const logoutBtn = document.getElementById('btn-logout');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', onLogout);
+        }
+    }
 }

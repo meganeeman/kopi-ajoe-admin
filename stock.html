@@ -13,36 +13,35 @@
     <div class="flex h-screen overflow-hidden">
 
         <aside class="w-64 bg-black text-white flex flex-col justify-between p-5 h-screen shrink-0">
-    <div>
-        <div class="mb-8 flex items-center gap-3">
-            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">
-                KA
-            </div>
             <div>
-                <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
-                <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">
+                        KA
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
+                        <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                    </div>
+                </div>
+
+                <nav id="sidebarNav" class="space-y-2">
+                </nav>
             </div>
-        </div>
 
-        <nav id="sidebarNav" class="space-y-2">
-            <!-- Tempat menu di-update dinamis oleh JS -->
-        </nav>
-    </div>
-
-    <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
-        <div>
-            <p id="sidebarUserName" class="text-xs font-bold text-white">Admin</p>
-            <p id="sidebarUserRole" class="text-[10px] text-zinc-500">Super Admin</p>
-        </div>
-        <button id="sidebarLogoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
-    </div>
-</aside>
+            <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
+                <div>
+                    <p id="sidebarUserName" class="text-xs font-bold text-white">Admin</p>
+                    <p id="sidebarUserRole" class="text-[10px] text-zinc-500">Super Admin</p>
+                </div>
+                <button id="sidebarLogoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
+            </div>
+        </aside>
 
         <main class="flex-1 overflow-y-auto p-8">
             <header class="flex justify-between items-center mb-8">
                 <div>
                     <h2 class="text-2xl font-extrabold text-zinc-900">Manajemen Stok & Permintaan Cabang</h2>
-                    <p class="text-xs text-zinc-500 mt-1">Kelola masukan stok dari pabrik, persetujuan request, dan pengembalian stok sales.</p>
+                    <p class="text-xs text-zinc-500 mt-1">Kelola masukan stok dari pabrik, persetujuan request, pengembalian stok, dan riwayat mutasi.</p>
                 </div>
                 <button id="enableAudioBtn" onclick="enableAudio()" class="bg-amber-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-sm hover:bg-amber-600 transition">
                     Tes / Aktifkan Suara Notif
@@ -80,8 +79,7 @@
             </div>
 
             <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
-                <!-- Tab Switcher Header -->
-                <div class="flex justify-between items-center mb-5 border-b border-zinc-100 pb-4">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5 border-b border-zinc-100 pb-4">
                     <div class="flex gap-2 bg-zinc-100 p-1 rounded-xl">
                         <button id="tabRequestBtn" onclick="switchTab('request')" class="px-4 py-2 rounded-lg font-bold text-xs bg-white text-black shadow-sm transition">
                             Permintaan Stok (Request)
@@ -89,7 +87,20 @@
                         <button id="tabReturnBtn" onclick="switchTab('return')" class="px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition">
                             Pengembalian Stok (Return)
                         </button>
+                        <button id="tabHistoryBtn" onclick="switchTab('history')" class="px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition">
+                            Riwayat Mutasi Stok
+                        </button>
                     </div>
+
+                    <div id="historyDateFilter" class="hidden flex-wrap items-center gap-2">
+                        <input type="date" id="startDateInput" class="bg-zinc-50 border border-zinc-200 text-xs font-bold text-zinc-700 px-3 py-1.5 rounded-lg outline-none focus:ring-2 focus:ring-black">
+                        <span class="text-xs font-bold text-zinc-400">s/d</span>
+                        <input type="date" id="endDateInput" class="bg-zinc-50 border border-zinc-200 text-xs font-bold text-zinc-700 px-3 py-1.5 rounded-lg outline-none focus:ring-2 focus:ring-black">
+                        <button onclick="loadHistoryMutations()" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-zinc-800 transition">
+                            Filter
+                        </button>
+                    </div>
+
                     <button onclick="loadActiveTabData()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">
                         Refresh Data
                     </button>
@@ -118,7 +129,6 @@
 
     </div>
 
-    <!-- Modal Custom Info Alert -->
     <div id="notifModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
             <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold animate-bounce">
@@ -132,7 +142,6 @@
         </div>
     </div>
 
-    <!-- Modal Detail Request/Return per Sales -->
     <div id="detailModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-zinc-100 pb-3">
@@ -144,11 +153,9 @@
             </div>
 
             <div class="max-h-60 overflow-y-auto divide-y divide-zinc-100" id="detailItemsList">
-                <!-- Detail item dimuat di sini -->
             </div>
 
             <div class="pt-3 flex justify-end gap-2" id="modalActionButtons">
-                <!-- Tombol Setujui dan Tolak -->
             </div>
         </div>
     </div>
@@ -162,10 +169,20 @@
         let activeTab = 'request';
         let globalGroupedData = {};
 
-        function getUnitLabel(category) {
-            if (!category) return 'Cup';
-            const catLower = category.toLowerCase();
-            if (catLower === 'food') return 'Pcs';
+        function initDateInputs() {
+            const end = new Date();
+            const start = new Date();
+            start.setDate(end.getDate() - 14);
+
+            document.getElementById('endDateInput').value = end.toISOString().split('T')[0];
+            document.getElementById('startDateInput').value = start.toISOString().split('T')[0];
+        }
+
+        function getUnitLabel(category, name) {
+            if (!category && !name) return 'Cup';
+            const catUpper = (category || '').toUpperCase();
+            const nameUpper = (name || '').toUpperCase();
+            if (catUpper === 'FOOD' || catUpper === 'ROTI' || nameUpper.includes('ROTI')) return 'Pcs';
             return 'Cup';
         }
 
@@ -239,13 +256,22 @@
             activeTab = tabName;
             const reqBtn = document.getElementById('tabRequestBtn');
             const retBtn = document.getElementById('tabReturnBtn');
+            const histBtn = document.getElementById('tabHistoryBtn');
+            const dateFilter = document.getElementById('historyDateFilter');
+
+            reqBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition';
+            retBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition';
+            histBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition';
+            dateFilter.classList.add('hidden');
 
             if (tabName === 'request') {
                 reqBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs bg-white text-black shadow-sm transition';
-                retBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition';
-            } else {
+            } else if (tabName === 'return') {
                 retBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs bg-white text-black shadow-sm transition';
-                reqBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs text-zinc-500 hover:text-black transition';
+            } else {
+                histBtn.className = 'px-4 py-2 rounded-lg font-bold text-xs bg-white text-black shadow-sm transition';
+                dateFilter.classList.remove('hidden');
+                dateFilter.classList.add('flex');
             }
 
             loadActiveTabData();
@@ -254,8 +280,10 @@
         function loadActiveTabData() {
             if (activeTab === 'request') {
                 loadPendingRequests();
-            } else {
+            } else if (activeTab === 'return') {
                 loadPendingReturns();
+            } else {
+                loadHistoryMutations();
             }
         }
 
@@ -299,12 +327,11 @@
                 const tableBody = document.getElementById('factoryStockTable');
                 tableBody.innerHTML = '';
 
-                // Filter out bundle items
                 const singleProducts = (products || []).filter(p => !p.is_bundle && p.category !== 'Bundle Promo');
 
                 singleProducts.forEach(p => {
                     const stockQty = Array.isArray(p.inventory) ? (p.inventory[0]?.stock || 0) : (p.inventory?.stock || 0);
-                    const unitLabel = getUnitLabel(p.category);
+                    const unitLabel = getUnitLabel(p.category, p.name);
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
@@ -442,11 +469,52 @@
             }
         }
 
+        async function loadHistoryMutations() {
+            try {
+                const startVal = document.getElementById('startDateInput').value;
+                const endVal = document.getElementById('endDateInput').value;
+
+                const startIso = new Date(`${startVal}T00:00:00`).toISOString();
+                const endIso = new Date(`${endVal}T23:59:59`).toISOString();
+
+                const { data: reqs } = await supabaseAdmin
+                    .from('stock_requests')
+                    .select(`
+                        id, quantity, status, created_at, product_id, cart_unit_id,
+                        products ( name, category, is_bundle ),
+                        cart_units ( active_sales_id, users ( name ) )
+                    `)
+                    .neq('status', 'pending')
+                    .gte('created_at', startIso)
+                    .lte('created_at', endIso);
+
+                const { data: rets } = await supabaseAdmin
+                    .from('stock_returns')
+                    .select(`
+                        id, quantity, status, created_at, product_id, cart_unit_id,
+                        products ( name, category, is_bundle ),
+                        cart_units ( active_sales_id, users ( name ) )
+                    `)
+                    .neq('status', 'pending')
+                    .gte('created_at', startIso)
+                    .lte('created_at', endIso);
+
+                const combined = [
+                    ...(reqs || []).map(r => ({ ...r, mutation_type: 'REQUEST' })),
+                    ...(rets || []).map(r => ({ ...r, mutation_type: 'RETURN' }))
+                ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                renderHistoryTable(combined);
+            } catch (err) {
+                console.error('Error load history:', err);
+                renderTableError('Gagal memuat riwayat mutasi stok.');
+            }
+        }
+
         function renderGroupedTable(dataItems, type) {
             const tableBody = document.getElementById('requestsTable');
             tableBody.innerHTML = '';
 
-            // Exclude bundles from requests/returns
             const filteredItems = (dataItems || []).filter(item => !item.products?.is_bundle && item.products?.category !== 'Bundle Promo');
 
             if (!filteredItems || filteredItems.length === 0) {
@@ -518,6 +586,37 @@
             }
         }
 
+        function renderHistoryTable(historyItems) {
+            const tableBody = document.getElementById('requestsTable');
+            tableBody.innerHTML = '';
+
+            if (!historyItems || historyItems.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-zinc-400">Belum ada riwayat mutasi stok pada rentang tanggal terpilih.</td></tr>`;
+                return;
+            }
+
+            historyItems.forEach(item => {
+                const dateStr = formatIndonesianDateTime(item.created_at);
+                const salesName = item.cart_units?.users?.name || 'Sales Partner';
+                const prodName = item.products?.name || 'Produk';
+                const typeLabel = item.mutation_type === 'REQUEST' ? 'REQUEST' : 'PENGEMBALIAN';
+                const unitLabel = getUnitLabel(item.products?.category, prodName);
+
+                let statusBadge = `<span class="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DISETUJUI</span>`;
+                if (item.status === 'rejected') statusBadge = `<span class="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DITOLAK</span>`;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3.5 px-2 text-zinc-500 font-medium">${dateStr}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-800">${prodName} (${item.quantity} ${unitLabel}) - <span class="text-[10px] text-zinc-400">${typeLabel}</span></td>
+                    <td class="py-3.5 px-2">${statusBadge}</td>
+                    <td class="py-3.5 px-2 text-right"><span class="text-zinc-400 text-[10px] font-semibold">Selesai</span></td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
         function renderTableError(message) {
             const tableBody = document.getElementById('requestsTable');
             tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-500 font-bold">${message}</td></tr>`;
@@ -535,7 +634,7 @@
             listContainer.innerHTML = '';
 
             group.items.forEach(item => {
-                const unitLabel = getUnitLabel(item.category);
+                const unitLabel = getUnitLabel(item.category, item.productName);
                 const div = document.createElement('div');
                 div.className = 'py-2 flex justify-between items-center text-xs';
                 div.innerHTML = `
@@ -680,6 +779,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
+            initDateInputs();
             await checkAuth();
             await loadProducts();
             await loadActiveTabData();
@@ -692,18 +792,10 @@
                 .channel('public:stock_requests')
                 .on(
                     'postgres_changes',
-                    { event: 'INSERT', schema: 'public', table: 'stock_requests' },
+                    { event: '*', schema: 'public', table: 'stock_requests' },
                     async (payload) => {
-                        console.log('Ada request stok baru:', payload);
-                        startNotificationSound();
-                        if (activeTab === 'request') await loadPendingRequests();
-                    }
-                )
-                .on(
-                    'postgres_changes',
-                    { event: 'UPDATE', schema: 'public', table: 'stock_requests' },
-                    async () => {
-                        if (activeTab === 'request') await loadPendingRequests();
+                        if (payload.eventType === 'INSERT') startNotificationSound();
+                        if (activeTab === 'request' || activeTab === 'history') await loadActiveTabData();
                     }
                 )
                 .subscribe();
@@ -712,18 +804,21 @@
                 .channel('public:stock_returns')
                 .on(
                     'postgres_changes',
-                    { event: 'INSERT', schema: 'public', table: 'stock_returns' },
+                    { event: '*', schema: 'public', table: 'stock_returns' },
                     async (payload) => {
-                        console.log('Ada pengembalian stok baru:', payload);
-                        startNotificationSound();
-                        if (activeTab === 'return') await loadPendingReturns();
+                        if (payload.eventType === 'INSERT') startNotificationSound();
+                        if (activeTab === 'return' || activeTab === 'history') await loadActiveTabData();
                     }
                 )
+                .subscribe();
+
+            supabaseAdmin
+                .channel('public:inventory')
                 .on(
                     'postgres_changes',
-                    { event: 'UPDATE', schema: 'public', table: 'stock_returns' },
+                    { event: '*', schema: 'public', table: 'inventory' },
                     async () => {
-                        if (activeTab === 'return') await loadPendingReturns();
+                        await loadProducts();
                     }
                 )
                 .subscribe();

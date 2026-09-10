@@ -34,6 +34,9 @@ function renderSidebar(activeMenuId, currentUser = null, onLogout = null) {
     const logoutBtn = document.getElementById('sidebarLogoutBtn');
     if (logoutBtn && typeof onLogout === 'function') {
         logoutBtn.replaceWith(logoutBtn.cloneNode(true));
-        document.getElementById('sidebarLogoutBtn').addEventListener('click', onLogout);
+        const newLogoutBtn = document.getElementById('sidebarLogoutBtn');
+        if (newLogoutBtn) {
+            newLogoutBtn.addEventListener('click', onLogout);
+        }
     }
 }
