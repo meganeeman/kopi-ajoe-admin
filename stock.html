@@ -327,7 +327,7 @@
                 const tableBody = document.getElementById('factoryStockTable');
                 tableBody.innerHTML = '';
 
-                const singleProducts = (products || []).filter(p => !p.is_bundle && p.category !== 'Bundle Promo');
+                const singleProducts = (products || []).filter(p => !p.is_bundle && (p.category || '').toUpperCase() !== 'BUNDLE PROMO' && (p.category || '').toUpperCase() !== 'BUNDLING');
 
                 singleProducts.forEach(p => {
                     const stockQty = Array.isArray(p.inventory) ? (p.inventory[0]?.stock || 0) : (p.inventory?.stock || 0);
@@ -515,7 +515,11 @@
             const tableBody = document.getElementById('requestsTable');
             tableBody.innerHTML = '';
 
-            const filteredItems = (dataItems || []).filter(item => !item.products?.is_bundle && item.products?.category !== 'Bundle Promo');
+            const filteredItems = (dataItems || []).filter(item => {
+                const isBundle = item.products?.is_bundle;
+                const catUpper = (item.products?.category || '').toUpperCase();
+                return !isBundle && catUpper !== 'BUNDLE PROMO' && catUpper !== 'BUNDLING';
+            });
 
             if (!filteredItems || filteredItems.length === 0) {
                 const label = type === 'request' ? 'permintaan' : 'pengembalian';
@@ -530,7 +534,15 @@
             filteredItems.forEach(item => {
                 const salesName = item.cart_units?.users?.name || 'Sales Partner';
                 const cartUnitId = item.cart_unit_id || 'unknown';
-                const key = `${cartUnitId}_${item.status}`;
+                
+                let timeKey = item.created_at;
+                if (item.created_at) {
+                    const d = new Date(item.created_at);
+                    d.setSeconds(0, 0);
+                    timeKey = d.toISOString();
+                }
+
+                const key = `${cartUnitId}_${item.status}_${timeKey}`;
 
                 if (item.status === 'pending') hasPendingGlobal = true;
 
@@ -545,13 +557,15 @@
                     };
                 }
 
-                globalGroupedData[key].totalQuantity += parseInt(item.quantity, 10);
+                const qtyNumber = parseInt(item.quantity, 10) || 0;
+
+                globalGroupedData[key].totalQuantity += qtyNumber;
                 globalGroupedData[key].items.push({
                     itemId: item.id,
                     productId: item.product_id,
                     productName: item.products?.name || 'Produk',
                     category: item.products?.category || '',
-                    quantity: item.quantity
+                    quantity: qtyNumber
                 });
             });
 
@@ -590,12 +604,18 @@
             const tableBody = document.getElementById('requestsTable');
             tableBody.innerHTML = '';
 
-            if (!historyItems || historyItems.length === 0) {
+            const filteredHistory = (historyItems || []).filter(item => {
+                const isBundle = item.products?.is_bundle;
+                const catUpper = (item.products?.category || '').toUpperCase();
+                return !isBundle && catUpper !== 'BUNDLE PROMO' && catUpper !== 'BUNDLING';
+            });
+
+            if (!filteredHistory || filteredHistory.length === 0) {
                 tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-zinc-400">Belum ada riwayat mutasi stok pada rentang tanggal terpilih.</td></tr>`;
                 return;
             }
 
-            historyItems.forEach(item => {
+            filteredHistory.forEach(item => {
                 const dateStr = formatIndonesianDateTime(item.created_at);
                 const salesName = item.cart_units?.users?.name || 'Sales Partner';
                 const prodName = item.products?.name || 'Produk';
