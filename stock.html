@@ -415,6 +415,9 @@
 
         async function loadPendingRequests() {
             try {
+                const startOfToday = new Date();
+                startOfToday.setHours(0, 0, 0, 0);
+
                 const { data: reqs, error } = await supabaseAdmin
                     .from('stock_requests')
                     .select(`
@@ -430,6 +433,7 @@
                             users ( name )
                         )
                     `)
+                    .gte('created_at', startOfToday.toISOString())
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
@@ -443,6 +447,9 @@
 
         async function loadPendingReturns() {
             try {
+                const startOfToday = new Date();
+                startOfToday.setHours(0, 0, 0, 0);
+
                 const { data: rets, error } = await supabaseAdmin
                     .from('stock_returns')
                     .select(`
@@ -458,6 +465,7 @@
                             users ( name )
                         )
                     `)
+                    .gte('created_at', startOfToday.toISOString())
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
