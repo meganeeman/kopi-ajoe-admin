@@ -3,6 +3,7 @@ function renderSidebar(activeMenuId, currentUser = null, onLogout = null) {
         { id: 'dashboard', label: 'Dashboard Utama', icon: '📊', path: 'index.html' },
         { id: 'stock', label: 'Manajemen Stok', icon: '📦', path: 'stock.html' },
         { id: 'reports', label: 'Laporan Penjualan', icon: '📈', path: 'report.html' },
+        { id: 'attendance', label: 'Rekap Absensi', icon: '⏰', path: 'attendance.html' },
     ];
 
     const currentFilename = window.location.pathname.split('/').pop() || 'index.html';

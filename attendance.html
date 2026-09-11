@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rekap Absensi - Kopi Ajoe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="css/theme.css">
+</head>
+<body class="bg-zinc-100 text-zinc-800">
+
+    <div class="flex h-screen overflow-hidden">
+
+        <aside class="w-64 bg-black text-white flex flex-col justify-between p-5 h-screen shrink-0">
+            <div>
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-extrabold text-black text-xl">
+                        KA
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-lg tracking-wider">KOPI AJOE</h1>
+                        <p class="text-xs text-zinc-400">Admin Control Panel</p>
+                    </div>
+                </div>
+
+                <nav id="sidebarNav" class="space-y-2">
+                </nav>
+            </div>
+
+            <div class="border-t border-zinc-800 pt-4 flex justify-between items-center">
+                <div>
+                    <p id="sidebarUserName" class="text-xs font-bold text-white">Admin</p>
+                    <p id="sidebarUserRole" class="text-[10px] text-zinc-500">Super Admin</p>
+                </div>
+                <button id="sidebarLogoutBtn" class="text-xs text-red-400 font-bold hover:underline">Keluar</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto p-8">
+            <header class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-2xl font-extrabold text-zinc-900">Rekap Absensi Sales</h2>
+                    <p class="text-xs text-zinc-500 mt-1">Pantau jam buka lapak (Clock In) dan tutup lapak (Clock Out) seluruh tim sales.</p>
+                </div>
+            </header>
+
+            <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5 border-b border-zinc-100 pb-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="date" id="startDateInput" class="bg-zinc-50 border border-zinc-200 text-xs font-bold text-zinc-700 px-3 py-1.5 rounded-lg outline-none focus:ring-2 focus:ring-black">
+                        <span class="text-xs font-bold text-zinc-400">s/d</span>
+                        <input type="date" id="endDateInput" class="bg-zinc-50 border border-zinc-200 text-xs font-bold text-zinc-700 px-3 py-1.5 rounded-lg outline-none focus:ring-2 focus:ring-black">
+                        <button onclick="loadAttendances()" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-zinc-800 transition">
+                            Filter
+                        </button>
+                    </div>
+
+                    <button onclick="loadAttendances()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">
+                        Refresh Data
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-zinc-100 text-[10px] font-bold text-zinc-400 uppercase">
+                                <th class="py-3 px-2">Tanggal</th>
+                                <th class="py-3 px-2">Nama Sales</th>
+                                <th class="py-3 px-2">Unit Gerobak</th>
+                                <th class="py-3 px-2 text-center">Jam Buka (Clock In)</th>
+                                <th class="py-3 px-2 text-center">Jam Tutup (Clock Out)</th>
+                                <th class="py-3 px-2 text-right">Durasi Lapak</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTable" class="text-xs divide-y divide-zinc-50 font-medium text-zinc-700">
+                            <tr>
+                                <td colspan="6" class="py-8 text-center text-zinc-400">Memuat data absensi...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="js/supabase.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script>
+        function initDateInputs() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('endDateInput').value = today;
+            document.getElementById('startDateInput').value = today;
+        }
+
+        function formatIndonesianTime(dateString) {
+            if (!dateString) return '-';
+            let formattedStr = dateString;
+            if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
+                formattedStr = dateString.replace(' ', 'T') + 'Z';
+            }
+            const d = new Date(formattedStr);
+            return d.toLocaleTimeString('id-ID', {
+                timeZone: 'Asia/Jakarta',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).replace(':', '.') + ' WIB';
+        }
+
+        function formatIndonesianDate(dateString) {
+            if (!dateString) return '-';
+            const d = new Date(dateString);
+            return d.toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+
+        function calculateDuration(startStr, endStr) {
+            if (!startStr || !endStr) return 'Sedang Buka Lapak';
+            
+            const start = new Date(startStr);
+            const end = new Date(endStr);
+            const diffMs = end - start;
+
+            if (diffMs < 0) return '-';
+
+            const diffMins = Math.floor(diffMs / 60000);
+            const hours = Math.floor(diffMins / 60);
+            const mins = diffMins % 60;
+
+            if (hours === 0) return `${mins} Menit`;
+            return `${hours} Jam ${mins} Menit`;
+        }
+
+        async function checkAuth() {
+            const { data: { session } } = await supabaseAdmin.auth.getSession();
+            if (!session) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const { data: userData } = await supabaseAdmin
+                .from('users')
+                .select('name')
+                .eq('id', session.user.id)
+                .maybeSingle();
+
+            renderSidebar('attendance', {
+                name: userData?.name || session.user.email.split('@')[0],
+                role: 'Super Admin'
+            }, async () => {
+                await supabaseAdmin.auth.signOut();
+                window.location.href = 'login.html';
+            });
+        }
+
+        async function loadAttendances() {
+            try {
+                const startVal = document.getElementById('startDateInput').value;
+                const endVal = document.getElementById('endDateInput').value;
+
+                const { data: attendances, error } = await supabaseAdmin
+                    .from('sales_attendances')
+                    .select(`
+                        id,
+                        attendance_date,
+                        clock_in,
+                        clock_out,
+                        users ( name ),
+                        cart_units ( unit_name )
+                    `)
+                    .gte('attendance_date', startVal)
+                    .lte('attendance_date', endVal)
+                    .order('attendance_date', { ascending: false })
+                    .order('clock_in', { ascending: false });
+
+                if (error) throw error;
+
+                renderAttendanceTable(attendances);
+            } catch (err) {
+                console.error('Error load attendances:', err);
+                const tableBody = document.getElementById('attendanceTable');
+                tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-500 font-bold">Gagal memuat data absensi.</td></tr>`;
+            }
+        }
+
+        function renderAttendanceTable(items) {
+            const tableBody = document.getElementById('attendanceTable');
+            tableBody.innerHTML = '';
+
+            if (!items || items.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Belum ada data absensi pada rentang tanggal terpilih.</td></tr>`;
+                return;
+            }
+
+            items.forEach(item => {
+                const dateStr = formatIndonesianDate(item.attendance_date);
+                const salesName = item.users?.name || 'Sales Partner';
+                const unitName = item.cart_units?.unit_name || 'Gerobak';
+                const clockInStr = formatIndonesianTime(item.clock_in);
+                const clockOutStr = item.clock_out ? formatIndonesianTime(item.clock_out) : '<span class="bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded text-[10px]">AKTIF</span>';
+                const duration = calculateDuration(item.clock_in, item.clock_out);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3.5 px-2 text-zinc-500 font-medium">${dateStr}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-700">${unitName}</td>
+                    <td class="py-3.5 px-2 text-center font-bold text-zinc-800">${clockInStr}</td>
+                    <td class="py-3.5 px-2 text-center font-bold text-zinc-800">${clockOutStr}</td>
+                    <td class="py-3.5 px-2 text-right font-extrabold text-black">${duration}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            initDateInputs();
+            await checkAuth();
+            await loadAttendances();
+
+            supabaseAdmin
+                .channel('public:sales_attendances')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'sales_attendances' },
+                    async () => {
+                        await loadAttendances();
+                    }
+                )
+                .subscribe();
+        });
+    </script>
+</body>
+</html>
