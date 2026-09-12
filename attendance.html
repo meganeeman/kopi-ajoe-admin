@@ -193,7 +193,11 @@
 
                 if (error) throw error;
 
-                currentAttendanceData = attendances || [];
+                currentAttendanceData = (attendances || []).filter(item => {
+                    const salesName = item.users?.name || '';
+                    const unitName = item.cart_units?.unit_name || '';
+                    return !/test/i.test(salesName) && !/test/i.test(unitName);
+                });
                 renderAttendanceTable(currentAttendanceData);
             } catch (err) {
                 console.error('Error load attendances:', err);
