@@ -6,6 +6,9 @@
     <title>Rekap Absensi - Kopi Ajoe Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="css/theme.css">
 </head>
 <body class="bg-zinc-100 text-zinc-800">
@@ -42,6 +45,14 @@
                 <div>
                     <h2 class="text-2xl font-extrabold text-zinc-900">Rekap Absensi Sales</h2>
                     <p class="text-xs text-zinc-500 mt-1">Pantau jam buka lapak (Clock In) dan tutup lapak (Clock Out) seluruh tim sales.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-sm">
+                        <span>📊</span> Export Excel
+                    </button>
+                    <button onclick="exportToPDF()" class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-sm">
+                        <span>📄</span> Export PDF
+                    </button>
                 </div>
             </header>
 
@@ -88,6 +99,8 @@
     <script src="js/supabase.js"></script>
     <script src="js/sidebar.js"></script>
     <script>
+        let currentAttendanceData = [];
+
         function initDateInputs() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('endDateInput').value = today;
@@ -180,7 +193,8 @@
 
                 if (error) throw error;
 
-                renderAttendanceTable(attendances);
+                currentAttendanceData = attendances || [];
+                renderAttendanceTable(currentAttendanceData);
             } catch (err) {
                 console.error('Error load attendances:', err);
                 const tableBody = document.getElementById('attendanceTable');
@@ -216,6 +230,80 @@
                 `;
                 tableBody.appendChild(tr);
             });
+        }
+
+        function exportToExcel() {
+            if (!currentAttendanceData || currentAttendanceData.length === 0) {
+                alert('Tidak ada data absensi untuk diexport.');
+                return;
+            }
+
+            const excelRows = currentAttendanceData.map(item => ({
+                'Tanggal': formatIndonesianDate(item.attendance_date),
+                'Nama Sales': item.users?.name || 'Sales Partner',
+                'Unit Gerobak': item.cart_units?.unit_name || 'Gerobak',
+                'Jam Buka (Clock In)': formatIndonesianTime(item.clock_in),
+                'Jam Tutup (Clock Out)': item.clock_out ? formatIndonesianTime(item.clock_out) : 'AKTIF',
+                'Durasi Lapak': calculateDuration(item.clock_in, item.clock_out)
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(excelRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Absensi");
+
+            const startVal = document.getElementById('startDateInput').value;
+            const endVal = document.getElementById('endDateInput').value;
+            XLSX.writeFile(workbook, `Rekap_Absensi_KopiAjoe_${startVal}_s_d_${endVal}.xlsx`);
+        }
+
+        function exportToPDF() {
+            if (!currentAttendanceData || currentAttendanceData.length === 0) {
+                alert('Tidak ada data absensi untuk diexport.');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+
+            const startVal = formatIndonesianDate(document.getElementById('startDateInput').value);
+            const endVal = formatIndonesianDate(document.getElementById('endDateInput').value);
+
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.text('REKAP ABSENSI SALES - KOPI AJOE', 14, 15);
+
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Periode: ${startVal} s/d ${endVal}`, 14, 22);
+
+            const tableHeaders = [["Tanggal", "Nama Sales", "Gerobak", "Clock In", "Clock Out", "Durasi"]];
+            const tableRows = currentAttendanceData.map(item => [
+                formatIndonesianDate(item.attendance_date),
+                item.users?.name || 'Sales Partner',
+                item.cart_units?.unit_name || 'Gerobak',
+                formatIndonesianTime(item.clock_in),
+                item.clock_out ? formatIndonesianTime(item.clock_out) : 'AKTIF',
+                calculateDuration(item.clock_in, item.clock_out)
+            ]);
+
+            doc.autoTable({
+                startY: 26,
+                head: tableHeaders,
+                body: tableRows,
+                theme: 'striped',
+                headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255], fontStyle: 'bold' },
+                styles: { fontSize: 8, cellPadding: 2.5 },
+                columnStyles: {
+                    0: { cellWidth: 25 },
+                    1: { cellWidth: 45 },
+                    2: { cellWidth: 35 },
+                    3: { cellWidth: 30, halign: 'center' },
+                    4: { cellWidth: 30, halign: 'center' },
+                    5: { cellWidth: 25, halign: 'right' }
+                }
+            });
+
+            doc.save(`Rekap_Absensi_KopiAjoe_${document.getElementById('startDateInput').value}.pdf`);
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
