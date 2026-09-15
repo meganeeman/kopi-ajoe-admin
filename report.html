@@ -233,17 +233,20 @@
         }
 
         async function checkAuth() {
-            const { data: { session } } = await supabaseAdmin.auth.getSession();
-            if (!session) {
-                window.location.href = 'login.html';
-                return;
-            }
+            try {
+                const { data: { session }, error: sessionError } = await supabaseAdmin.auth.getSession();
+                if (sessionError) throw sessionError;
+                if (!session) {
+                    window.location.href = 'login.html';
+                    return false;
+                }
 
-            const { data: userData } = await supabaseAdmin
-                .from('users')
-                .select('name, role, branch, city')
-                .eq('id', session.user.id)
-                .maybeSingle();
+                const { data: userData, error: profileError } = await supabaseAdmin
+                    .from('users')
+                    .select('name, role, branch, city')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+                if (profileError) throw profileError;
 
             if (userData) {
                 currentUserRole = userData.role || null;
@@ -265,6 +268,11 @@
                 await supabaseAdmin.auth.signOut();
                 window.location.href = 'login.html';
             });
+                return true;
+            } catch (err) {
+                console.error('Error check auth:', err);
+                return false;
+            }
         }
 
         function setFilter(type) {
@@ -682,7 +690,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            await checkAuth();
+            if (!await checkAuth()) return;
             await loadReportData();
         });
     </script>
