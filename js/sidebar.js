@@ -8,6 +8,17 @@ function renderSidebar(activeMenuId, currentUser = null, onLogout = null) {
 
     const currentFilename = window.location.pathname.split('/').pop() || 'index.html';
 
+    function getProfileSubtitle(user) {
+        const branch = String(user.branch || '').trim();
+        const city = String(user.city || '').trim();
+        if (branch && branch.toUpperCase() !== 'ALL') {
+            return city ? `${branch} - ${city}` : branch;
+        }
+
+        const role = String(user.role || 'Admin').replace(/_/g, ' ').trim();
+        return role.replace(/\b\w/g, character => character.toUpperCase());
+    }
+
     const navContainer = document.getElementById('sidebarNav');
     if (navContainer) {
         navContainer.innerHTML = menuItems.map((item) => {
@@ -29,7 +40,7 @@ function renderSidebar(activeMenuId, currentUser = null, onLogout = null) {
         const nameEl = document.getElementById('sidebarUserName');
         const roleEl = document.getElementById('sidebarUserRole');
         if (nameEl) nameEl.innerText = currentUser.name || 'Admin';
-        if (roleEl) roleEl.innerText = currentUser.role || 'Super Admin';
+        if (roleEl) roleEl.innerText = getProfileSubtitle(currentUser);
     }
 
     const logoutBtn = document.getElementById('sidebarLogoutBtn');

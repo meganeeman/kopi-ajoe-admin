@@ -166,9 +166,8 @@
         let currentFilter = 'daily';
         let rawTransactionsData = [];
         let usersMap = {};
-        let productsList = [];
         let currentUserBranch = 'ALL';
-        let currentUserRole = 'super_admin';
+        let currentUserRole = null;
 
         const BRANCH_NAMES = {
             'ALL': 'Semua Cabang',
@@ -204,6 +203,35 @@
             return BRANCH_NAMES[code] || code || 'Cabang';
         }
 
+        function ensureSupabaseSuccess(result, action) {
+            if (result.error) {
+                throw new Error(`${action}: ${result.error.message}`);
+            }
+            return result;
+        }
+
+        function getJakartaDateString(date = new Date()) {
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Jakarta',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }).formatToParts(date);
+            const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+            return `${values.year}-${values.month}-${values.day}`;
+        }
+
+        function shiftDateString(dateString, days) {
+            const date = new Date(`${dateString}T00:00:00Z`);
+            date.setUTCDate(date.getUTCDate() + days);
+            return date.toISOString().slice(0, 10);
+        }
+
+        function getNumericValue(value) {
+            const numericValue = Number(value);
+            return Number.isFinite(numericValue) ? numericValue : 0;
+        }
+
         async function checkAuth() {
             const { data: { session } } = await supabaseAdmin.auth.getSession();
             if (!session) {
@@ -213,12 +241,12 @@
 
             const { data: userData } = await supabaseAdmin
                 .from('users')
-                .select('name, role, branch')
-                .eq('email', session.user.email)
+                .select('name, role, branch, city')
+                .eq('id', session.user.id)
                 .maybeSingle();
 
             if (userData) {
-                currentUserRole = userData.role || 'admin';
+                currentUserRole = userData.role || null;
                 currentUserBranch = userData.branch || 'ALL';
 
                 if (currentUserRole !== 'super_admin' && currentUserBranch !== 'ALL') {
@@ -228,12 +256,11 @@
                 }
             }
 
-            const isSuperAdmin = !userData?.branch || userData?.branch === 'ALL' || userData?.role === 'super_admin' || userData?.role === 'admin';
-            const displayRole = isSuperAdmin ? 'Super Admin' : `Admin ${userData?.branch || ''}`;
-
             renderSidebar('reports', {
                 name: userData?.name || session.user.email.split('@')[0],
-                role: displayRole
+                role: userData?.role,
+                branch: userData?.branch,
+                city: userData?.city
             }, async () => {
                 await supabaseAdmin.auth.signOut();
                 window.location.href = 'login.html';
@@ -259,23 +286,26 @@
 
         async function loadReportData() {
             try {
-                const now = new Date();
-                let startDate = new Date();
+                const jakartaToday = getJakartaDateString();
+                let startDate = jakartaToday;
 
                 if (currentFilter === 'daily') {
-                    startDate.setHours(0, 0, 0, 0);
+                    startDate = jakartaToday;
                 } else if (currentFilter === 'weekly') {
-                    startDate.setDate(now.getDate() - 7);
+                    startDate = shiftDateString(jakartaToday, -7);
                 } else if (currentFilter === 'monthly') {
-                    startDate.setDate(1);
-                    startDate.setHours(0, 0, 0, 0);
+                    startDate = `${jakartaToday.slice(0, 7)}-01`;
                 }
+
+                const startIso = `${startDate}T00:00:00+07:00`;
+                const endIso = `${jakartaToday}T23:59:59.999+07:00`;
 
                 let query = supabaseAdmin
                     .from('transactions')
                     .select('id, sales_id, total_price, payment_method, total_cups, created_at, items, branch')
                     .eq('payment_status', 'success')
-                    .gte('created_at', startDate.toISOString())
+                    .gte('created_at', startIso)
+                    .lte('created_at', endIso)
                     .order('created_at', { ascending: false });
 
                 if (currentUserRole !== 'super_admin' && currentUserBranch !== 'ALL') {
@@ -286,12 +316,14 @@
                 if (error) throw error;
                 rawTransactionsData = transactions || [];
 
-                const { data: usersData } = await supabaseAdmin
+                const usersResult = await supabaseAdmin
                     .from('users')
                     .select('id, name, branch')
                     .eq('role', 'sales')
                     .neq('name', 'Test')
                     .order('name', { ascending: true });
+                ensureSupabaseSuccess(usersResult, 'Gagal memuat data sales');
+                const usersData = usersResult.data;
 
                 usersMap = {};
                 const salesSelect = document.getElementById('salesSelectFilter');
@@ -307,10 +339,12 @@
                     });
                 }
 
-                const { data: prodData } = await supabaseAdmin
+                const productsResult = await supabaseAdmin
                     .from('products')
                     .select('name')
                     .order('name', { ascending: true });
+                ensureSupabaseSuccess(productsResult, 'Gagal memuat data produk');
+                const prodData = productsResult.data;
 
                 const productSelect = document.getElementById('productSelectFilter');
                 productSelect.innerHTML = '<option value="">-- Semua Produk --</option>';
@@ -389,7 +423,8 @@
             const salesAggMap = {};
 
             filteredData.forEach(t => {
-                totalRev += (t.total_price || 0);
+                const transactionPrice = getNumericValue(t.total_price);
+                totalRev += transactionPrice;
 
                 let rowCups = 0;
                 let rowRoti = 0;
@@ -415,7 +450,7 @@
                         itemsSummaryArr.push(`${name} (x${qty})`);
                     });
                 } else {
-                    rowCups = t.total_cups || 0;
+                    rowCups = getNumericValue(t.total_cups);
                     itemsSummaryArr.push(`Minuman (x${rowCups})`);
                 }
 
@@ -441,7 +476,7 @@
                 salesAggMap[sId].txCount += 1;
                 salesAggMap[sId].totalCups += rowCups;
                 salesAggMap[sId].totalRoti += rowRoti;
-                salesAggMap[sId].totalRevenue += (t.total_price || 0);
+                salesAggMap[sId].totalRevenue += transactionPrice;
 
                 const txBranchCode = t.branch || (salesObj ? salesObj.branch : 'PYK');
                 const branchLabel = getBranchLabel(txBranchCode);
@@ -459,7 +494,7 @@
                             ${t.payment_method || 'CASH'}
                         </span>
                     </td>
-                    <td class="py-3.5 px-2 text-right font-extrabold text-black">Rp ${(t.total_price || 0).toLocaleString('id-ID')}</td>
+                    <td class="py-3.5 px-2 text-right font-extrabold text-black">Rp ${transactionPrice.toLocaleString('id-ID')}</td>
                 `;
                 tableBody.appendChild(tr);
             });
@@ -522,11 +557,11 @@
                         itemsSummaryArr.push(`${name} (x${qty})`);
                     });
                 } else {
-                    rowCups = t.total_cups || 0;
+                    rowCups = getNumericValue(t.total_cups);
                     itemsSummaryArr.push(`Minuman (x${rowCups})`);
                 }
 
-                const price = t.total_price || 0;
+                const price = getNumericValue(t.total_price);
                 grandTotalCups += rowCups;
                 grandTotalRoti += rowRoti;
                 grandTotalRevenue += price;
@@ -603,11 +638,11 @@
                         itemsSummaryArr.push(`${name} (x${qty})`);
                     });
                 } else {
-                    rowCups = t.total_cups || 0;
+                    rowCups = getNumericValue(t.total_cups);
                     itemsSummaryArr.push(`Minuman (x${rowCups})`);
                 }
 
-                const price = t.total_price || 0;
+                const price = getNumericValue(t.total_price);
                 grandTotalCups += rowCups;
                 grandTotalRoti += rowRoti;
                 grandTotalRevenue += price;

@@ -65,6 +65,7 @@
                         <button onclick="loadAttendances()" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-zinc-800 transition">
                             Filter
                         </button>
+                        <input type="search" id="searchSalesInput" placeholder="Cari nama sales..." class="w-full sm:w-44 bg-zinc-50 border border-zinc-200 text-xs font-bold text-zinc-700 px-3 py-1.5 rounded-lg outline-none focus:ring-2 focus:ring-black">
                     </div>
 
                     <button onclick="loadAttendances()" class="text-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-3 py-1.5 rounded-lg font-bold transition">
@@ -101,19 +102,48 @@
     <script>
         let currentAttendanceData = [];
 
+        function ensureSupabaseSuccess(result, action) {
+            if (result.error) {
+                throw new Error(`${action}: ${result.error.message}`);
+            }
+            return result;
+        }
+
+        function getJakartaDateString(date = new Date()) {
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Jakarta',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }).formatToParts(date);
+            const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+            return `${values.year}-${values.month}-${values.day}`;
+        }
+
+        function parseJakartaDate(value) {
+            if (!value) return null;
+
+            let normalizedValue = String(value).replace(' ', 'T');
+            if (/^\d{4}-\d{2}-\d{2}$/.test(normalizedValue)) {
+                normalizedValue += 'T00:00:00';
+            }
+            if (!normalizedValue.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(normalizedValue)) {
+                normalizedValue += '+07:00';
+            }
+
+            const parsedDate = new Date(normalizedValue);
+            return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+        }
+
         function initDateInputs() {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getJakartaDateString();
             document.getElementById('endDateInput').value = today;
             document.getElementById('startDateInput').value = today;
         }
 
         function formatIndonesianTime(dateString) {
-            if (!dateString) return '-';
-            let formattedStr = dateString;
-            if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
-                formattedStr = dateString.replace(' ', 'T') + 'Z';
-            }
-            const d = new Date(formattedStr);
+            const d = parseJakartaDate(dateString);
+            if (!d) return '-';
             return d.toLocaleTimeString('id-ID', {
                 timeZone: 'Asia/Jakarta',
                 hour: '2-digit',
@@ -123,9 +153,10 @@
         }
 
         function formatIndonesianDate(dateString) {
-            if (!dateString) return '-';
-            const d = new Date(dateString);
+            const d = parseJakartaDate(dateString);
+            if (!d) return '-';
             return d.toLocaleDateString('id-ID', {
+                timeZone: 'Asia/Jakarta',
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric'
@@ -133,13 +164,17 @@
         }
 
         function calculateDuration(startStr, endStr) {
-            if (!startStr || !endStr) return 'Sedang Buka Lapak';
-            
-            const start = new Date(startStr);
-            const end = new Date(endStr);
+            if (!startStr && !endStr) return '-';
+            if (startStr && !endStr) return 'Sedang Buka Lapak';
+            if (!startStr || !endStr) return '-';
+
+            const start = parseJakartaDate(startStr);
+            const end = parseJakartaDate(endStr);
+            if (!start || !end) return '-';
+
             const diffMs = end - start;
 
-            if (diffMs < 0) return '-';
+            if (!Number.isFinite(diffMs) || diffMs < 0) return '-';
 
             const diffMins = Math.floor(diffMs / 60000);
             const hours = Math.floor(diffMins / 60);
@@ -150,25 +185,37 @@
         }
 
         async function checkAuth() {
-            const { data: { session } } = await supabaseAdmin.auth.getSession();
-            if (!session) {
-                window.location.href = 'login.html';
-                return;
+            try {
+                const sessionResult = await supabaseAdmin.auth.getSession();
+                ensureSupabaseSuccess(sessionResult, 'Gagal memeriksa sesi login');
+                const { session } = sessionResult.data;
+                if (!session) {
+                    window.location.href = 'login.html';
+                    return false;
+                }
+
+                const userResult = await supabaseAdmin
+                    .from('users')
+                    .select('name, role, branch, city')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+                ensureSupabaseSuccess(userResult, 'Gagal memuat profil admin');
+
+                renderSidebar('attendance', {
+                    name: userResult.data?.name || session.user.email.split('@')[0],
+                    role: userResult.data?.role,
+                    branch: userResult.data?.branch,
+                    city: userResult.data?.city
+                }, async () => {
+                    await supabaseAdmin.auth.signOut();
+                    window.location.href = 'login.html';
+                });
+                return true;
+            } catch (err) {
+                console.error('Error check auth:', err);
+                document.getElementById('attendanceTable').innerHTML = '<tr><td colspan="6" class="py-8 text-center text-red-500 font-bold">Gagal memverifikasi akses.</td></tr>';
+                return false;
             }
-
-            const { data: userData } = await supabaseAdmin
-                .from('users')
-                .select('name')
-                .eq('id', session.user.id)
-                .maybeSingle();
-
-            renderSidebar('attendance', {
-                name: userData?.name || session.user.email.split('@')[0],
-                role: 'Super Admin'
-            }, async () => {
-                await supabaseAdmin.auth.signOut();
-                window.location.href = 'login.html';
-            });
         }
 
         async function loadAttendances() {
@@ -209,13 +256,18 @@
         function renderAttendanceTable(items) {
             const tableBody = document.getElementById('attendanceTable');
             tableBody.innerHTML = '';
+            const searchTerm = document.getElementById('searchSalesInput').value.toLowerCase().trim();
+            const filteredItems = (items || []).filter(item => {
+                const salesName = item.users?.name || 'Sales Partner';
+                return !searchTerm || salesName.toLowerCase().includes(searchTerm);
+            });
 
-            if (!items || items.length === 0) {
+            if (filteredItems.length === 0) {
                 tableBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-zinc-400">Belum ada data absensi pada rentang tanggal terpilih.</td></tr>`;
                 return;
             }
 
-            items.forEach(item => {
+            filteredItems.forEach(item => {
                 const dateStr = formatIndonesianDate(item.attendance_date);
                 const salesName = item.users?.name || 'Sales Partner';
                 const unitName = item.cart_units?.unit_name || 'Gerobak';
@@ -315,8 +367,11 @@
             
             document.getElementById('startDateInput').addEventListener('change', loadAttendances);
             document.getElementById('endDateInput').addEventListener('change', loadAttendances);
+            document.getElementById('searchSalesInput').addEventListener('input', () => {
+                renderAttendanceTable(currentAttendanceData);
+            });
 
-            await checkAuth();
+            if (!await checkAuth()) return;
             await loadAttendances();
 
             supabaseAdmin
@@ -328,7 +383,11 @@
                         await loadAttendances();
                     }
                 )
-                .subscribe();
+                .subscribe((status, error) => {
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        console.error(`Realtime attendance channel ${status.toLowerCase()}.`, error || 'No error details provided.');
+                    }
+                });
         });
     </script>
 </body>

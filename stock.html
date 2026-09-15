@@ -249,6 +249,13 @@
             modal.classList.add('hidden');
         }
 
+        function ensureSupabaseSuccess(result, action) {
+            if (result.error) {
+                throw new Error(`${action}: ${result.error.message}`);
+            }
+            return result;
+        }
+
         function switchTab(tabName) {
             activeTab = tabName;
             const reqBtn = document.getElementById('tabRequestBtn');
@@ -289,13 +296,15 @@
 
             const { data: userData } = await supabaseAdmin
                 .from('users')
-                .select('name, branch, city')
+                .select('name, role, branch, city')
                 .eq('id', session.user.id)
                 .maybeSingle();
 
             renderSidebar('stock', {
                 name: userData?.name || session.user.email.split('@')[0],
-                role: 'Super Admin'
+                role: userData?.role,
+                branch: userData?.branch,
+                city: userData?.city
             }, async () => {
                 await supabaseAdmin.auth.signOut();
                 window.location.href = 'login.html';
@@ -322,6 +331,11 @@
 
                 const singleProducts = (products || []).filter(p => !p.is_bundle && (p.category || '').toUpperCase() !== 'BUNDLE PROMO' && (p.category || '').toUpperCase() !== 'BUNDLING');
 
+                if (singleProducts.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-zinc-400">Belum ada produk yang dapat diatur stoknya.</td></tr>';
+                    return;
+                }
+
                 singleProducts.forEach(p => {
                     const stockQty = Array.isArray(p.inventory) ? (p.inventory[0]?.stock || 0) : (p.inventory?.stock || 0);
                     const unitLabel = getUnitLabel(p.category, p.name);
@@ -337,7 +351,6 @@
                                 min="0" 
                                 placeholder="+0" 
                                 data-product-id="${p.id}"
-                                data-current-stock="${stockQty}"
                                 class="batch-stock-input w-28 px-3 py-1.5 rounded-lg border border-zinc-200 text-xs font-bold text-right focus:outline-none focus:ring-2 focus:ring-black"
                             >
                         </td>
@@ -345,7 +358,8 @@
                     tableBody.appendChild(tr);
                 });
             } catch (err) {
-                console.log('Error load products:', err);
+                console.error('Error load products:', err);
+                document.getElementById('factoryStockTable').innerHTML = '<tr><td colspan="4" class="py-6 text-center text-red-500 font-bold">Gagal memuat stok gudang.</td></tr>';
             }
         }
 
@@ -357,11 +371,9 @@
                 const val = parseInt(input.value);
                 if (!isNaN(val) && val > 0) {
                     const productId = input.getAttribute('data-product-id');
-                    const currentStock = parseInt(input.getAttribute('data-current-stock')) || 0;
                     updates.push({
                         productId: productId,
-                        addedQty: val,
-                        newTotal: currentStock + val
+                        addedQty: val
                     });
                 }
             });
@@ -377,21 +389,25 @@
 
             try {
                 for (const item of updates) {
-                    const { data: inv } = await supabaseAdmin
+                    const inventoryResult = await supabaseAdmin
                         .from('inventory')
                         .select('stock')
                         .eq('product_id', item.productId)
                         .maybeSingle();
+                    ensureSupabaseSuccess(inventoryResult, 'Gagal membaca stok');
+                    const currentStock = Number(inventoryResult.data?.stock) || 0;
 
-                    if (inv) {
-                        await supabaseAdmin
+                    if (inventoryResult.data) {
+                        const updateResult = await supabaseAdmin
                             .from('inventory')
-                            .update({ stock: item.newTotal })
+                            .update({ stock: currentStock + item.addedQty })
                             .eq('product_id', item.productId);
+                        ensureSupabaseSuccess(updateResult, 'Gagal memperbarui stok');
                     } else {
-                        await supabaseAdmin
+                        const insertResult = await supabaseAdmin
                             .from('inventory')
                             .insert({ product_id: item.productId, stock: item.addedQty });
+                        ensureSupabaseSuccess(insertResult, 'Gagal membuat stok');
                     }
                 }
 
@@ -486,7 +502,7 @@
                 const startIso = new Date(`${startVal}T00:00:00`).toISOString();
                 const endIso = new Date(`${endVal}T23:59:59`).toISOString();
 
-                const { data: reqs } = await supabaseAdmin
+                const requestsResult = await supabaseAdmin
                     .from('stock_requests')
                     .select(`
                         id, quantity, status, created_at, product_id, cart_unit_id,
@@ -496,8 +512,9 @@
                     .neq('status', 'pending')
                     .gte('created_at', startIso)
                     .lte('created_at', endIso);
+                ensureSupabaseSuccess(requestsResult, 'Gagal memuat riwayat permintaan');
 
-                const { data: rets } = await supabaseAdmin
+                const returnsResult = await supabaseAdmin
                     .from('stock_returns')
                     .select(`
                         id, quantity, status, created_at, product_id, cart_unit_id,
@@ -507,10 +524,11 @@
                     .neq('status', 'pending')
                     .gte('created_at', startIso)
                     .lte('created_at', endIso);
+                ensureSupabaseSuccess(returnsResult, 'Gagal memuat riwayat pengembalian');
 
                 const combined = [
-                    ...(reqs || []).map(r => ({ ...r, mutation_type: 'REQUEST' })),
-                    ...(rets || []).map(r => ({ ...r, mutation_type: 'RETURN' }))
+                    ...(requestsResult.data || []).map(r => ({ ...r, mutation_type: 'REQUEST' })),
+                    ...(returnsResult.data || []).map(r => ({ ...r, mutation_type: 'RETURN' }))
                 ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
                 renderHistoryTable(combined);
@@ -533,12 +551,10 @@
             if (!filteredItems || filteredItems.length === 0) {
                 const label = type === 'request' ? 'permintaan' : 'pengembalian';
                 tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-zinc-400">Belum ada ${label} stok dari sales pada rentang tanggal terpilih.</td></tr>`;
-                stopNotificationSound();
                 return;
             }
 
             globalGroupedData = {};
-            let hasPendingGlobal = false;
 
             filteredItems.forEach(item => {
                 const salesName = item.cart_units?.users?.name || 'Sales Partner';
@@ -552,8 +568,6 @@
                 }
 
                 const key = `${cartUnitId}_${item.status}_${timeKey}`;
-
-                if (item.status === 'pending') hasPendingGlobal = true;
 
                 if (!globalGroupedData[key]) {
                     globalGroupedData[key] = {
@@ -604,9 +618,6 @@
                 tableBody.appendChild(tr);
             });
 
-            if (!hasPendingGlobal) {
-                stopNotificationSound();
-            }
         }
 
         function renderHistoryTable(historyItems) {
@@ -698,77 +709,90 @@
             try {
                 if (activeTab === 'request') {
                     for (const item of group.items) {
-                        await supabaseAdmin
+                        const requestUpdate = await supabaseAdmin
                             .from('stock_requests')
                             .update({ status: 'approved' })
                             .eq('id', item.itemId);
+                        ensureSupabaseSuccess(requestUpdate, 'Gagal menyetujui permintaan');
 
                         if (group.cartUnitId && group.cartUnitId !== 'unknown') {
-                            const { data: existingStock } = await supabaseAdmin
+                            const stockResult = await supabaseAdmin
                                 .from('cart_stocks')
                                 .select('id, quantity')
                                 .eq('cart_unit_id', group.cartUnitId)
                                 .eq('product_id', item.productId)
                                 .maybeSingle();
+                            ensureSupabaseSuccess(stockResult, 'Gagal membaca stok gerobak');
+                            const existingStock = stockResult.data;
 
                             if (existingStock) {
                                 const newQty = (existingStock.quantity || 0) + parseInt(item.quantity, 10);
-                                await supabaseAdmin
+                                const stockUpdate = await supabaseAdmin
                                     .from('cart_stocks')
                                     .update({ quantity: newQty })
                                     .eq('id', existingStock.id);
+                                ensureSupabaseSuccess(stockUpdate, 'Gagal menambah stok gerobak');
                             } else {
-                                await supabaseAdmin
+                                const stockInsert = await supabaseAdmin
                                     .from('cart_stocks')
                                     .insert({
                                         cart_unit_id: group.cartUnitId,
                                         product_id: item.productId,
                                         quantity: parseInt(item.quantity, 10)
                                     });
+                                ensureSupabaseSuccess(stockInsert, 'Gagal membuat stok gerobak');
                             }
                         }
                     }
                     showNotifModal(`Berhasil menyetujui permintaan stok dari ${group.salesName}!`);
                 } else {
                     for (const item of group.items) {
-                        await supabaseAdmin
+                        const returnUpdate = await supabaseAdmin
                             .from('stock_returns')
                             .update({ status: 'approved' })
                             .eq('id', item.itemId);
+                        ensureSupabaseSuccess(returnUpdate, 'Gagal menyetujui pengembalian');
 
                         if (group.cartUnitId && group.cartUnitId !== 'unknown') {
-                            const { data: existingStock } = await supabaseAdmin
+                            const stockResult = await supabaseAdmin
                                 .from('cart_stocks')
                                 .select('id, quantity')
                                 .eq('cart_unit_id', group.cartUnitId)
                                 .eq('product_id', item.productId)
                                 .maybeSingle();
+                            ensureSupabaseSuccess(stockResult, 'Gagal membaca stok gerobak');
+                            const existingStock = stockResult.data;
 
                             if (existingStock) {
                                 const remainingQty = Math.max(0, (existingStock.quantity || 0) - parseInt(item.quantity, 10));
-                                await supabaseAdmin
+                                const stockUpdate = await supabaseAdmin
                                     .from('cart_stocks')
                                     .update({ quantity: remainingQty })
                                     .eq('id', existingStock.id);
+                                ensureSupabaseSuccess(stockUpdate, 'Gagal mengurangi stok gerobak');
                             }
                         }
 
-                        const { data: inv } = await supabaseAdmin
+                        const inventoryResult = await supabaseAdmin
                             .from('inventory')
                             .select('id, stock')
                             .eq('product_id', item.productId)
                             .maybeSingle();
+                        ensureSupabaseSuccess(inventoryResult, 'Gagal membaca stok gudang');
+                        const inv = inventoryResult.data;
 
                         if (inv) {
                             const newInvTotal = (inv.stock || 0) + parseInt(item.quantity, 10);
-                            await supabaseAdmin
+                            const inventoryUpdate = await supabaseAdmin
                                 .from('inventory')
                                 .update({ stock: newInvTotal })
                                 .eq('id', inv.id);
+                            ensureSupabaseSuccess(inventoryUpdate, 'Gagal menambah stok gudang');
                         } else {
-                            await supabaseAdmin
+                            const inventoryInsert = await supabaseAdmin
                                 .from('inventory')
                                 .insert({ product_id: item.productId, stock: parseInt(item.quantity, 10) });
+                            ensureSupabaseSuccess(inventoryInsert, 'Gagal membuat stok gudang');
                         }
                     }
                     showNotifModal(`Berhasil menyetujui pengembalian stok dari ${group.salesName}!`);
@@ -793,10 +817,11 @@
 
             try {
                 for (const item of group.items) {
-                    await supabaseAdmin
+                    const rejectionResult = await supabaseAdmin
                         .from(tableName)
                         .update({ status: 'rejected' })
                         .eq('id', item.itemId);
+                    ensureSupabaseSuccess(rejectionResult, 'Gagal menolak pengajuan');
                 }
 
                 showNotifModal(`Pengajuan dari ${group.salesName} berhasil DITOLAK.`);

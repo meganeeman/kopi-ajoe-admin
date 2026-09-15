@@ -145,6 +145,33 @@
         let selectedBranchFilter = 'ALL';
         let branchCoordsMap = {};
 
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[character]));
+        }
+
+        function createMapMarkerIcon(salesName, photoUrl) {
+            if (!photoUrl) return new L.Icon.Default();
+
+            const initial = escapeHtml((salesName || '?').trim().charAt(0).toUpperCase() || '?');
+            const safePhotoUrl = escapeHtml(photoUrl);
+            return L.divIcon({
+                className: 'custom-avatar-marker',
+                html: `<div style="width:42px;height:42px;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.35);overflow:hidden;background:#18181b;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px;">
+                    <img src="${safePhotoUrl}" alt="${escapeHtml(salesName)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex';">
+                    <span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;">${initial}</span>
+                </div>`,
+                iconSize: [42, 42],
+                iconAnchor: [21, 21],
+                popupAnchor: [0, -21]
+            });
+        }
+
         function initMap() {
             map = L.map('map').setView([-0.2292, 100.6308], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -161,7 +188,7 @@
 
             const { data: adminProfile } = await supabaseAdmin
                 .from('users')
-                .select('name, branch, city')
+                .select('name, role, branch, city')
                 .eq('id', session.user.id)
                 .maybeSingle();
 
@@ -169,11 +196,10 @@
             
             const branch = adminProfile?.branch;
             const city = adminProfile?.city;
-            const isSuperAdmin = !branch || !city || branch === 'ALL' || city === 'ALL';
+            const role = String(adminProfile?.role || '').toLowerCase();
+            const isSuperAdmin = role === 'super_admin' || (role === 'admin' && (!branch || branch === 'ALL'));
             
-            selectedBranchFilter = isSuperAdmin ? 'ALL' : branch;
-
-            const locationText = isSuperAdmin ? 'Super Admin' : `${branch} - ${city}`;
+            selectedBranchFilter = isSuperAdmin ? 'ALL' : (branch || 'ALL');
 
             if (isSuperAdmin) {
                 document.getElementById('branchFilterContainer').classList.remove('hidden');
@@ -182,7 +208,9 @@
 
             renderSidebar('dashboard', {
                 name: adminProfile?.name || session.user.email.split('@')[0],
-                role: locationText
+                role: adminProfile?.role,
+                branch: adminProfile?.branch,
+                city: adminProfile?.city
             }, async () => {
                 await supabaseAdmin.auth.signOut();
                 window.location.href = 'login.html';
@@ -293,7 +321,8 @@
                             id,
                             name,
                             branch,
-                            city
+                            city,
+                            avatar_url
                         )
                     `)
                     .not('unit_name', 'ilike', '%test%');
@@ -319,6 +348,7 @@
 
                 units.forEach(unit => {
                     const salesName = unit.users?.name || 'Sales Belum Set';
+                    const photoUrl = unit.users?.avatar_url;
                     const isOpen = unit.is_open;
 
                     const card = document.createElement('div');
@@ -354,9 +384,13 @@
                         `;
 
                         if (markers[unit.id]) {
-                            markers[unit.id].setLatLng([unit.latitude, unit.longitude]).setPopupContent(popupContent);
+                            markers[unit.id]
+                                .setLatLng([unit.latitude, unit.longitude])
+                                .setIcon(createMapMarkerIcon(salesName, photoUrl))
+                                .setPopupContent(popupContent);
                         } else {
                             const newMarker = L.marker([unit.latitude, unit.longitude])
+                                .setIcon(createMapMarkerIcon(salesName, photoUrl))
                                 .addTo(map)
                                 .bindPopup(popupContent);
                             markers[unit.id] = newMarker;
