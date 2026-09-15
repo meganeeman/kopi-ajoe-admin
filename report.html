@@ -232,6 +232,51 @@
             return Number.isFinite(numericValue) ? numericValue : 0;
         }
 
+        function parseTransactionItems(items) {
+            if (typeof items === 'string') {
+                try {
+                    return JSON.parse(items);
+                } catch (error) {
+                    return [];
+                }
+            }
+            return Array.isArray(items) ? items : [];
+        }
+
+        function getTransactionVolume(transaction) {
+            const parsedItems = parseTransactionItems(transaction.items);
+            if (parsedItems.length === 0) {
+                const totalCups = getNumericValue(transaction.total_cups);
+                return {
+                    rowCups: totalCups,
+                    rowRoti: 0,
+                    itemsSummaryArr: [`Minuman (x${totalCups})`]
+                };
+            }
+
+            let rowCups = 0;
+            let rowRoti = 0;
+            const itemsSummaryArr = [];
+
+            parsedItems.forEach(item => {
+                const name = item.name || item.product_name || item.product?.name || 'Produk';
+                const category = item.category || item.product?.category || item.products?.category || '';
+                const type = item.type || item.product_type || item.product?.type || '';
+                const classification = `${category} ${type} ${name}`.toLowerCase();
+                const quantity = getNumericValue(item.quantity ?? item.qty ?? 1);
+
+                if (classification.includes('roti') || classification.includes('snack') || classification.includes('makanan') || classification.includes('food')) {
+                    rowRoti += quantity;
+                } else {
+                    rowCups += quantity;
+                }
+
+                itemsSummaryArr.push(`${name} (x${quantity})`);
+            });
+
+            return { rowCups, rowRoti, itemsSummaryArr };
+        }
+
         async function checkAuth() {
             try {
                 const { data: { session }, error: sessionError } = await supabaseAdmin.auth.getSession();
@@ -434,33 +479,7 @@
                 const transactionPrice = getNumericValue(t.total_price);
                 totalRev += transactionPrice;
 
-                let rowCups = 0;
-                let rowRoti = 0;
-                let itemsSummaryArr = [];
-
-                let parsedItems = t.items;
-                if (typeof parsedItems === 'string') {
-                    try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
-                }
-
-                if (Array.isArray(parsedItems) && parsedItems.length > 0) {
-                    parsedItems.forEach(item => {
-                        const name = item.name || item.product_name || 'Produk';
-                        const cat = (item.category || name || '').toLowerCase();
-                        const qty = parseInt(item.quantity || item.qty || 1);
-
-                        if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
-                            rowRoti += qty;
-                        } else {
-                            rowCups += qty;
-                        }
-
-                        itemsSummaryArr.push(`${name} (x${qty})`);
-                    });
-                } else {
-                    rowCups = getNumericValue(t.total_cups);
-                    itemsSummaryArr.push(`Minuman (x${rowCups})`);
-                }
+                const { rowCups, rowRoti, itemsSummaryArr } = getTransactionVolume(t);
 
                 const itemDetailsStr = itemsSummaryArr.join(', ');
 
@@ -543,31 +562,7 @@
 
             const exportRows = filteredData.map(t => {
                 const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
-                let rowCups = 0;
-                let rowRoti = 0;
-                let itemsSummaryArr = [];
-
-                let parsedItems = t.items;
-                if (typeof parsedItems === 'string') {
-                    try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
-                }
-
-                if (Array.isArray(parsedItems) && parsedItems.length > 0) {
-                    parsedItems.forEach(item => {
-                        const name = item.name || item.product_name || 'Produk';
-                        const cat = (item.category || name || '').toLowerCase();
-                        const qty = parseInt(item.quantity || item.qty || 1);
-                        if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
-                            rowRoti += qty;
-                        } else {
-                            rowCups += qty;
-                        }
-                        itemsSummaryArr.push(`${name} (x${qty})`);
-                    });
-                } else {
-                    rowCups = getNumericValue(t.total_cups);
-                    itemsSummaryArr.push(`Minuman (x${rowCups})`);
-                }
+                const { rowCups, rowRoti, itemsSummaryArr } = getTransactionVolume(t);
 
                 const price = getNumericValue(t.total_price);
                 grandTotalCups += rowCups;
@@ -624,31 +619,7 @@
 
             const tableRows = filteredData.map(t => {
                 const salesObj = t.sales_id ? usersMap[t.sales_id] : null;
-                let rowCups = 0;
-                let rowRoti = 0;
-                let itemsSummaryArr = [];
-
-                let parsedItems = t.items;
-                if (typeof parsedItems === 'string') {
-                    try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
-                }
-
-                if (Array.isArray(parsedItems) && parsedItems.length > 0) {
-                    parsedItems.forEach(item => {
-                        const name = item.name || item.product_name || 'Produk';
-                        const cat = (item.category || name || '').toLowerCase();
-                        const qty = parseInt(item.quantity || item.qty || 1);
-                        if (cat.includes('roti') || cat.includes('snack') || cat.includes('makanan')) {
-                            rowRoti += qty;
-                        } else {
-                            rowCups += qty;
-                        }
-                        itemsSummaryArr.push(`${name} (x${qty})`);
-                    });
-                } else {
-                    rowCups = getNumericValue(t.total_cups);
-                    itemsSummaryArr.push(`Minuman (x${rowCups})`);
-                }
+                const { rowCups, rowRoti, itemsSummaryArr } = getTransactionVolume(t);
 
                 const price = getNumericValue(t.total_price);
                 grandTotalCups += rowCups;
