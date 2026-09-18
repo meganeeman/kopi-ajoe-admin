@@ -227,23 +227,30 @@
 
         async function loadBranchOptions() {
             try {
-                const { data: branches, error } = await supabaseAdmin
-                    .from('branches')
-                    .select('branch_name, city, latitude, longitude')
-                    .order('branch_name', { ascending: true });
+                // No dedicated "branches" table exists; derive distinct branches from users.branch/city.
+                const { data: users, error } = await supabaseAdmin
+                    .from('users')
+                    .select('branch, city')
+                    .not('branch', 'is', null)
+                    .neq('branch', 'ALL')
+                    .order('branch', { ascending: true });
 
-                if (error || !branches) return;
+                if (error || !users) return;
+
+                const branchCityMap = new Map();
+                users.forEach(u => {
+                    if (u.branch && !branchCityMap.has(u.branch)) {
+                        branchCityMap.set(u.branch, u.city || '');
+                    }
+                });
 
                 const select = document.getElementById('branchSelect');
-                branches.forEach(b => {
+                Array.from(branchCityMap.keys()).sort().forEach(branchCode => {
+                    const city = branchCityMap.get(branchCode);
                     const opt = document.createElement('option');
-                    opt.value = b.branch_name;
-                    opt.innerText = `${b.branch_name} (${b.city || 'Cabang'})`;
+                    opt.value = branchCode;
+                    opt.innerText = `${branchCode} (${city || 'Cabang'})`;
                     select.appendChild(opt);
-
-                    if (b.latitude && b.longitude) {
-                        branchCoordsMap[b.branch_name] = [b.latitude, b.longitude];
-                    }
                 });
             } catch (err) {
                 console.log('Error load branch options:', err);
