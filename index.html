@@ -200,6 +200,12 @@
             const branch = adminProfile?.branch;
             const city = adminProfile?.city;
             const role = String(adminProfile?.role || '').toLowerCase();
+            if (!['admin', 'super_admin'].includes(role)) {
+                supabaseAdmin.auth.signOut();
+                window.location.replace('login.html');
+                return false;
+            }
+
             const isSuperAdmin = role === 'super_admin' || (role === 'admin' && (!branch || branch === 'ALL'));
             
             selectedBranchFilter = isSuperAdmin ? 'ALL' : (branch || 'ALL');
@@ -227,29 +233,26 @@
 
         async function loadBranchOptions() {
             try {
-                // No dedicated "branches" table exists; derive distinct branches from users.branch/city.
                 const { data: users, error } = await supabaseAdmin
                     .from('users')
-                    .select('branch, city')
+                    .select('branch')
                     .not('branch', 'is', null)
-                    .neq('branch', 'ALL')
                     .order('branch', { ascending: true });
 
-                if (error || !users) return;
+                if (error) throw error;
 
-                const branchCityMap = new Map();
-                users.forEach(u => {
-                    if (u.branch && !branchCityMap.has(u.branch)) {
-                        branchCityMap.set(u.branch, u.city || '');
-                    }
-                });
+                const branches = [...new Set((users || [])
+                    .map(user => String(user.branch || '').trim())
+                    .filter(branch => branch && branch.toUpperCase() !== 'ALL'))]
+                    .sort((first, second) => first.localeCompare(second));
 
                 const select = document.getElementById('branchSelect');
-                Array.from(branchCityMap.keys()).sort().forEach(branchCode => {
-                    const city = branchCityMap.get(branchCode);
+                select.replaceChildren(new Option('Semua Cabang', 'ALL'));
+
+                branches.forEach(branchCode => {
                     const opt = document.createElement('option');
                     opt.value = branchCode;
-                    opt.innerText = `${branchCode} (${city || 'Cabang'})`;
+                    opt.innerText = branchCode;
                     select.appendChild(opt);
                 });
             } catch (err) {
@@ -287,23 +290,23 @@
                     transQuery = transQuery.eq('branch', selectedBranchFilter);
                 }
 
-                const { data: trans } = await transQuery;
+                const { data: trans, error: transactionsError } = await transQuery;
+                if (transactionsError) throw transactionsError;
 
-                if (trans) {
-                    const todayCash = trans
-                        .filter(t => (t.payment_method || 'CASH').toUpperCase() === 'CASH')
-                        .reduce((sum, t) => sum + (t.total_price || 0), 0);
+                const transactions = trans || [];
+                const todayCash = transactions
+                    .filter(t => (t.payment_method || 'CASH').toUpperCase() === 'CASH')
+                    .reduce((sum, t) => sum + (Number(t.total_price) || 0), 0);
 
-                    const todayQris = trans
-                        .filter(t => (t.payment_method || '').toUpperCase() === 'QRIS')
-                        .reduce((sum, t) => sum + (t.total_price || 0), 0);
+                const todayQris = transactions
+                    .filter(t => (t.payment_method || '').toUpperCase() === 'QRIS')
+                    .reduce((sum, t) => sum + (Number(t.total_price) || 0), 0);
 
-                    const totalCups = trans.reduce((sum, t) => sum + (t.total_cups || 0), 0);
+                const totalCups = transactions.reduce((sum, t) => sum + (Number(t.total_cups) || 0), 0);
 
-                    document.getElementById('statTodayCash').innerText = `Rp ${todayCash.toLocaleString('id-ID')}`;
-                    document.getElementById('statTodayQris').innerText = `Rp ${todayQris.toLocaleString('id-ID')}`;
-                    document.getElementById('statTodayCups').innerText = `${totalCups} Cup`;
-                }
+                document.getElementById('statTodayCash').innerText = `Rp ${todayCash.toLocaleString('id-ID')}`;
+                document.getElementById('statTodayQris').innerText = `Rp ${todayQris.toLocaleString('id-ID')}`;
+                document.getElementById('statTodayCups').innerText = `${totalCups} Cup`;
 
                 let salesQuery = supabaseAdmin
                     .from('users')
@@ -317,7 +320,8 @@
                     document.getElementById('statSalesSubtext').innerText = 'Terdaftar di seluruh cabang';
                 }
 
-                const { count: salesCount } = await salesQuery;
+                const { count: salesCount, error: salesError } = await salesQuery;
+                if (salesError) throw salesError;
                 document.getElementById('statTotalSales').innerText = `${salesCount || 0} Sales`;
 
             } catch (err) {
@@ -340,7 +344,6 @@
                         users!inner (
                             id,
                             name,
-                            branch,
                             city,
                             avatar_url
                         )
@@ -360,6 +363,14 @@
 
                 const listContainer = document.getElementById('cartUnitsList');
                 listContainer.innerHTML = '';
+                const visibleUnitIds = new Set((units || []).map(unit => unit.id));
+
+                Object.entries(markers).forEach(([unitId, marker]) => {
+                    if (!visibleUnitIds.has(unitId)) {
+                        map.removeLayer(marker);
+                        delete markers[unitId];
+                    }
+                });
 
                 if (!units || units.length === 0) {
                     listContainer.innerHTML = `<p class="text-xs text-zinc-400 text-center py-8">Belum ada unit gerobak di cabang ini.</p>`;
@@ -376,32 +387,39 @@
                     card.innerHTML = `
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-xs font-extrabold text-zinc-900">${salesName}</p>
-                                <p class="text-[11px] text-zinc-500 font-medium">${unit.unit_name} (${unit.vehicle_type || 'Sepeda'})</p>
+                                <p class="text-xs font-extrabold text-zinc-900">${escapeHtml(salesName)}</p>
+                                <p class="text-[11px] text-zinc-500 font-medium">${escapeHtml(unit.unit_name)} (${escapeHtml(unit.vehicle_type || 'Sepeda')})</p>
                             </div>
                             <span class="text-[10px] font-bold px-2.5 py-1 rounded-md ${isOpen ? 'bg-green-100 text-green-700' : 'bg-zinc-200 text-zinc-600'}">
                                 ${isOpen ? '● BUKA' : 'OFFLINE'}
                             </span>
                         </div>
                         <div class="pt-1 border-t border-zinc-200/60 flex justify-end">
-                            <button onclick="openStockModal('${unit.id}', '${salesName}', '${unit.unit_name}')" class="text-[11px] font-bold text-zinc-700 hover:text-black bg-white hover:bg-zinc-100 border border-zinc-200 px-3 py-1 rounded-lg transition">
+                            <button class="open-stock-button text-[11px] font-bold text-zinc-700 hover:text-black bg-white hover:bg-zinc-100 border border-zinc-200 px-3 py-1 rounded-lg transition">
                                 🔍 Cek Stok Gerobak
                             </button>
                         </div>
                     `;
+                    card.querySelector('.open-stock-button').addEventListener('click', () => {
+                        openStockModal(unit.id, salesName, unit.unit_name);
+                    });
                     listContainer.appendChild(card);
 
                     if (isOpen && unit.latitude && unit.longitude) {
-                        const popupContent = `
+                        const popupContent = document.createElement('div');
+                        popupContent.className = 'text-center font-sans';
+                        popupContent.innerHTML = `
                             <div class="text-center font-sans">
-                                <b style="font-size: 13px;">${salesName}</b><br>
-                                <span style="font-size: 11px; color: #666;">${unit.unit_name}</span><br>
-                                <button onclick="openStockModal('${unit.id}', '${salesName}', '${unit.unit_name}')" 
-                                        style="margin-top: 6px; background: #000; color: #fff; border: none; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">
+                                <b style="font-size: 13px;">${escapeHtml(salesName)}</b><br>
+                                <span style="font-size: 11px; color: #666;">${escapeHtml(unit.unit_name)}</span><br>
+                                <button class="open-stock-button" style="margin-top: 6px; background: #000; color: #fff; border: none; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">
                                     Cek Stok
                                 </button>
                             </div>
                         `;
+                        popupContent.querySelector('.open-stock-button').addEventListener('click', () => {
+                            openStockModal(unit.id, salesName, unit.unit_name);
+                        });
 
                         if (markers[unit.id]) {
                             markers[unit.id]
@@ -461,7 +479,7 @@
                 cartStocks.forEach(item => {
                     const prodName = item.products?.name || 'Produk';
                     const category = item.products?.category || 'Kategori';
-                    const qty = item.quantity || 0;
+                    const qty = Number(item.quantity) || 0;
 
                     const catUpper = category.toUpperCase();
                     const nameUpper = prodName.toUpperCase();
@@ -472,8 +490,8 @@
                     div.className = 'py-2.5 flex justify-between items-center text-xs';
                     div.innerHTML = `
                         <div>
-                            <p class="font-bold text-zinc-800">${prodName}</p>
-                            <p class="text-[10px] text-zinc-400 font-semibold">${category}</p>
+                            <p class="font-bold text-zinc-800">${escapeHtml(prodName)}</p>
+                            <p class="text-[10px] text-zinc-400 font-semibold">${escapeHtml(category)}</p>
                         </div>
                         <span class="font-extrabold text-black bg-zinc-100 px-2.5 py-1 rounded-md ${qty === 0 ? 'text-red-500' : ''}">${qty} ${unitLabel}</span>
                     `;

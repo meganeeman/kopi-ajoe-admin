@@ -194,6 +194,20 @@
             return 'Cup';
         }
 
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[character]));
+        }
+
+        function encodeGroupKey(groupKey) {
+            return encodeURIComponent(groupKey).replace(/'/g, '%27');
+        }
+
         function formatIndonesianDateTime(dateString) {
             if (!dateString) return '-';
             let formattedStr = dateString;
@@ -303,7 +317,7 @@
                 const { data: { session }, error: sessionError } = await supabaseAdmin.auth.getSession();
                 if (sessionError) throw sessionError;
                 if (!session) {
-                    window.location.href = 'login.html';
+                    window.location.replace('login.html');
                     return false;
                 }
 
@@ -315,6 +329,12 @@
                 if (profileError) throw profileError;
 
             const role = String(userData?.role || '').toLowerCase();
+            if (!['admin', 'super_admin'].includes(role)) {
+                supabaseAdmin.auth.signOut();
+                window.location.replace('login.html');
+                return false;
+            }
+
             const branch = userData?.branch;
             const isSuperAdmin = role === 'super_admin' || (role === 'admin' && (!branch || branch === 'ALL'));
 
@@ -332,11 +352,12 @@
                 city: userData?.city
             }, async () => {
                 await supabaseAdmin.auth.signOut();
-                window.location.href = 'login.html';
+                window.location.replace('login.html');
             });
                 return true;
             } catch (err) {
                 console.error('Error check auth:', err);
+                window.location.replace('login.html');
                 return false;
             }
         }
@@ -385,8 +406,8 @@
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td class="py-3 px-2 font-bold text-zinc-400">${p.category || 'COFFEE'}</td>
-                        <td class="py-3 px-2 font-bold text-zinc-900">${p.name}</td>
+                        <td class="py-3 px-2 font-bold text-zinc-400">${escapeHtml(p.category || 'COFFEE')}</td>
+                        <td class="py-3 px-2 font-bold text-zinc-900">${escapeHtml(p.name)}</td>
                         <td class="py-3 px-2 text-center font-extrabold text-black">${stockQty} ${unitLabel}</td>
                         <td class="py-3 px-2 text-right">
                             <input 
@@ -650,16 +671,17 @@
                 if (group.status === 'rejected') statusBadge = `<span class="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-md text-[10px]">DITOLAK</span>`;
 
                 const tr = document.createElement('tr');
+                const encodedGroupKey = encodeGroupKey(groupKey);
                 tr.innerHTML = `
-                    <td class="py-3.5 px-2 text-zinc-500 font-medium">${dateStr}</td>
-                    <td class="py-3.5 px-2 font-bold text-zinc-900">${group.salesName}</td>
+                    <td class="py-3.5 px-2 text-zinc-500 font-medium">${escapeHtml(dateStr)}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-900">${escapeHtml(group.salesName)}</td>
                     <td class="py-3.5 px-2 text-center font-extrabold text-black">${group.items.length} Macam (${group.totalQuantity} Item)</td>
                     <td class="py-3.5 px-2">${statusBadge}</td>
                     <td class="py-3.5 px-2 text-right space-x-2">
-                        <button onclick="openDetailModal('${groupKey}')" class="bg-zinc-100 text-zinc-800 px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-200 transition text-xs">Detail Items</button>
+                        <button onclick="openDetailModal('${encodedGroupKey}')" class="bg-zinc-100 text-zinc-800 px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-200 transition text-xs">Detail Items</button>
                         ${isPending ? `
-                            <button onclick="handleGroupApprove('${groupKey}')" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-800 transition text-xs">Setujui</button>
-                            <button onclick="handleGroupReject('${groupKey}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition text-xs">Tolak</button>
+                            <button onclick="handleGroupApprove('${encodedGroupKey}')" class="bg-black text-white px-3 py-1.5 rounded-lg font-bold hover:bg-zinc-800 transition text-xs">Setujui</button>
+                            <button onclick="handleGroupReject('${encodedGroupKey}')" class="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition text-xs">Tolak</button>
                         ` : `<span class="text-zinc-400 text-[10px] font-semibold">Selesai</span>`}
                     </td>
                 `;
@@ -695,9 +717,9 @@
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="py-3.5 px-2 text-zinc-500 font-medium">${dateStr}</td>
-                    <td class="py-3.5 px-2 font-bold text-zinc-900">${salesName}</td>
-                    <td class="py-3.5 px-2 font-bold text-zinc-800">${prodName} (${item.quantity} ${unitLabel}) - <span class="text-[10px] text-zinc-400">${typeLabel}</span></td>
+                    <td class="py-3.5 px-2 text-zinc-500 font-medium">${escapeHtml(dateStr)}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-900">${escapeHtml(salesName)}</td>
+                    <td class="py-3.5 px-2 font-bold text-zinc-800">${escapeHtml(prodName)} (${Number(item.quantity) || 0} ${escapeHtml(unitLabel)}) - <span class="text-[10px] text-zinc-400">${escapeHtml(typeLabel)}</span></td>
                     <td class="py-3.5 px-2">${statusBadge}</td>
                     <td class="py-3.5 px-2 text-right"><span class="text-zinc-400 text-[10px] font-semibold">Selesai</span></td>
                 `;
@@ -707,10 +729,11 @@
 
         function renderTableError(message) {
             const tableBody = document.getElementById('requestsTable');
-            tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-500 font-bold">${message}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-red-500 font-bold">${escapeHtml(message)}</td></tr>`;
         }
 
         function openDetailModal(groupKey) {
+            groupKey = decodeURIComponent(groupKey);
             const group = globalGroupedData[groupKey];
             if (!group) return;
 
@@ -726,20 +749,21 @@
                 const div = document.createElement('div');
                 div.className = 'py-2 flex justify-between items-center text-xs';
                 div.innerHTML = `
-                    <span class="font-bold text-zinc-800">${item.productName}</span>
-                    <span class="font-extrabold text-black">${item.quantity} ${unitLabel}</span>
+                    <span class="font-bold text-zinc-800">${escapeHtml(item.productName)}</span>
+                    <span class="font-extrabold text-black">${Number(item.quantity) || 0} ${escapeHtml(unitLabel)}</span>
                 `;
                 listContainer.appendChild(div);
             });
 
             const actionContainer = document.getElementById('modalActionButtons');
+            const encodedGroupKey = encodeGroupKey(groupKey);
             if (group.status === 'pending') {
                 actionContainer.innerHTML = `
-                    <button onclick="handleGroupReject('${groupKey}')" class="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-xl font-bold hover:bg-red-100 text-xs transition">Tolak</button>
-                    <button onclick="handleGroupApprove('${groupKey}')" class="bg-black text-white px-4 py-2 rounded-xl font-bold hover:bg-zinc-800 text-xs transition">Setujui</button>
+                    <button onclick="handleGroupReject('${encodedGroupKey}')" class="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-xl font-bold hover:bg-red-100 text-xs transition">Tolak</button>
+                    <button onclick="handleGroupApprove('${encodedGroupKey}')" class="bg-black text-white px-4 py-2 rounded-xl font-bold hover:bg-zinc-800 text-xs transition">Setujui</button>
                 `;
             } else {
-                actionContainer.innerHTML = `<span class="text-xs text-zinc-400 font-bold">Pengajuan ini sudah selesai (${group.status})</span>`;
+                actionContainer.innerHTML = `<span class="text-xs text-zinc-400 font-bold">Pengajuan ini sudah selesai (${escapeHtml(group.status)})</span>`;
             }
 
             const modal = document.getElementById('detailModal');
@@ -748,6 +772,7 @@
         }
 
         async function handleGroupApprove(groupKey) {
+            groupKey = decodeURIComponent(groupKey);
             const group = globalGroupedData[groupKey];
             if (!group) return;
 
@@ -757,40 +782,11 @@
             try {
                 if (activeTab === 'request') {
                     for (const item of group.items) {
-                        const requestUpdate = await supabaseAdmin
-                            .from('stock_requests')
-                            .update({ status: 'approved' })
-                            .eq('id', item.itemId);
-                        ensureSupabaseSuccess(requestUpdate, 'Gagal menyetujui permintaan');
-
-                        if (group.cartUnitId && group.cartUnitId !== 'unknown') {
-                            const stockResult = await supabaseAdmin
-                                .from('cart_stocks')
-                                .select('id, quantity')
-                                .eq('cart_unit_id', group.cartUnitId)
-                                .eq('product_id', item.productId)
-                                .maybeSingle();
-                            ensureSupabaseSuccess(stockResult, 'Gagal membaca stok gerobak');
-                            const existingStock = stockResult.data;
-
-                            if (existingStock) {
-                                const newQty = (existingStock.quantity || 0) + parseInt(item.quantity, 10);
-                                const stockUpdate = await supabaseAdmin
-                                    .from('cart_stocks')
-                                    .update({ quantity: newQty })
-                                    .eq('id', existingStock.id);
-                                ensureSupabaseSuccess(stockUpdate, 'Gagal menambah stok gerobak');
-                            } else {
-                                const stockInsert = await supabaseAdmin
-                                    .from('cart_stocks')
-                                    .insert({
-                                        cart_unit_id: group.cartUnitId,
-                                        product_id: item.productId,
-                                        quantity: parseInt(item.quantity, 10)
-                                    });
-                                ensureSupabaseSuccess(stockInsert, 'Gagal membuat stok gerobak');
-                            }
-                        }
+                        const { data, error } = await supabaseAdmin.rpc('approve_stock_request', {
+                            p_request_id: item.itemId
+                        });
+                        if (error) throw error;
+                        if (!data?.success) throw new Error(data?.message || 'Gagal menyetujui permintaan stok.');
                     }
                     showNotifModal(`Berhasil menyetujui permintaan stok dari ${group.salesName}!`);
                 } else {
@@ -856,6 +852,7 @@
         }
 
         async function handleGroupReject(groupKey) {
+            groupKey = decodeURIComponent(groupKey);
             const group = globalGroupedData[groupKey];
             if (!group) return;
 
