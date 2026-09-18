@@ -43,9 +43,19 @@
                     <h2 class="text-2xl font-extrabold text-zinc-900">Manajemen Stok & Permintaan Cabang</h2>
                     <p class="text-xs text-zinc-500 mt-1">Kelola masukan stok dari pabrik, persetujuan request, pengembalian stok, dan riwayat mutasi.</p>
                 </div>
-                <button id="enableAudioBtn" onclick="enableAudio()" class="bg-amber-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-sm hover:bg-amber-600 transition">
-                    Tes / Aktifkan Suara Notif
-                </button>
+                <div class="flex items-center gap-2">
+                    <div id="stockBranchFilterContainer" class="hidden">
+                        <select id="stockBranchSelect" onchange="handleStockBranchChange()" class="bg-white px-3 py-2 rounded-xl border border-zinc-200 shadow-sm text-xs font-bold text-zinc-700 outline-none cursor-pointer">
+                            <option value="PYK">Payakumbuh (PYK)</option>
+                            <option value="BKT">Bukittinggi (BKT)</option>
+                            <option value="SLK">Solok (SLK)</option>
+                            <option value="PDG">Padang (PDG)</option>
+                        </select>
+                    </div>
+                    <button id="enableAudioBtn" onclick="enableAudio()" class="bg-amber-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-sm hover:bg-amber-600 transition">
+                        Tes / Aktifkan Suara Notif
+                    </button>
+                </div>
             </header>
 
             <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-8">
@@ -168,6 +178,7 @@
 
         let activeTab = 'request';
         let globalGroupedData = {};
+        let currentAdminBranch = 'PYK';
 
         function initDateInputs() {
             const today = new Date().toISOString().split('T')[0];
@@ -303,6 +314,17 @@
                     .maybeSingle();
                 if (profileError) throw profileError;
 
+            const role = String(userData?.role || '').toLowerCase();
+            const branch = userData?.branch;
+            const isSuperAdmin = role === 'super_admin' || (role === 'admin' && (!branch || branch === 'ALL'));
+
+            if (isSuperAdmin) {
+                document.getElementById('stockBranchFilterContainer').classList.remove('hidden');
+                currentAdminBranch = document.getElementById('stockBranchSelect').value || 'PYK';
+            } else {
+                currentAdminBranch = branch || 'PYK';
+            }
+
             renderSidebar('stock', {
                 name: userData?.name || session.user.email.split('@')[0],
                 role: userData?.role,
@@ -319,6 +341,11 @@
             }
         }
 
+        function handleStockBranchChange() {
+            currentAdminBranch = document.getElementById('stockBranchSelect').value || 'PYK';
+            loadProducts();
+        }
+
         async function loadProducts() {
             try {
                 const { data: products, error } = await supabaseAdmin
@@ -327,12 +354,20 @@
                         id,
                         name,
                         category,
-                        is_bundle,
-                        inventory ( stock )
+                        is_bundle
                     `)
                     .order('name');
 
                 if (error) throw error;
+
+                const { data: inventoryRows, error: inventoryError } = await supabaseAdmin
+                    .from('inventory')
+                    .select('product_id, stock')
+                    .eq('branch', currentAdminBranch);
+
+                if (inventoryError) throw inventoryError;
+
+                const stockByProductId = new Map((inventoryRows || []).map(row => [row.product_id, row.stock]));
 
                 const tableBody = document.getElementById('factoryStockTable');
                 tableBody.innerHTML = '';
@@ -345,7 +380,7 @@
                 }
 
                 singleProducts.forEach(p => {
-                    const stockQty = Array.isArray(p.inventory) ? (p.inventory[0]?.stock || 0) : (p.inventory?.stock || 0);
+                    const stockQty = Number(stockByProductId.get(p.id)) || 0;
                     const unitLabel = getUnitLabel(p.category, p.name);
 
                     const tr = document.createElement('tr');
@@ -401,6 +436,7 @@
                         .from('inventory')
                         .select('stock')
                         .eq('product_id', item.productId)
+                        .eq('branch', currentAdminBranch)
                         .maybeSingle();
                     ensureSupabaseSuccess(inventoryResult, 'Gagal membaca stok');
                     const currentStock = Number(inventoryResult.data?.stock) || 0;
@@ -409,12 +445,13 @@
                         const updateResult = await supabaseAdmin
                             .from('inventory')
                             .update({ stock: currentStock + item.addedQty })
-                            .eq('product_id', item.productId);
+                            .eq('product_id', item.productId)
+                            .eq('branch', currentAdminBranch);
                         ensureSupabaseSuccess(updateResult, 'Gagal memperbarui stok');
                     } else {
                         const insertResult = await supabaseAdmin
                             .from('inventory')
-                            .insert({ product_id: item.productId, stock: item.addedQty });
+                            .insert({ product_id: item.productId, branch: currentAdminBranch, stock: item.addedQty });
                         ensureSupabaseSuccess(insertResult, 'Gagal membuat stok');
                     }
                 }
@@ -450,6 +487,7 @@
                         products ( name, category, is_bundle ),
                         cart_units (
                             active_sales_id,
+                            branch,
                             users ( name )
                         )
                     `)
@@ -486,6 +524,7 @@
                         products ( name, category, is_bundle ),
                         cart_units (
                             active_sales_id,
+                            branch,
                             users ( name )
                         )
                     `)
@@ -580,6 +619,7 @@
                 if (!globalGroupedData[key]) {
                     globalGroupedData[key] = {
                         cartUnitId: cartUnitId,
+                        branch: item.cart_units?.branch || currentAdminBranch,
                         salesName: salesName,
                         status: item.status,
                         latestTime: item.created_at,
@@ -785,6 +825,7 @@
                             .from('inventory')
                             .select('id, stock')
                             .eq('product_id', item.productId)
+                            .eq('branch', group.branch)
                             .maybeSingle();
                         ensureSupabaseSuccess(inventoryResult, 'Gagal membaca stok gudang');
                         const inv = inventoryResult.data;
@@ -799,7 +840,7 @@
                         } else {
                             const inventoryInsert = await supabaseAdmin
                                 .from('inventory')
-                                .insert({ product_id: item.productId, stock: parseInt(item.quantity, 10) });
+                                .insert({ product_id: item.productId, branch: group.branch, stock: parseInt(item.quantity, 10) });
                             ensureSupabaseSuccess(inventoryInsert, 'Gagal membuat stok gudang');
                         }
                     }

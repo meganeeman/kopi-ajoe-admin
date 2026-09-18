@@ -283,6 +283,10 @@
                     .eq('payment_status', 'success')
                     .gte('created_at', todayISO);
 
+                if (selectedBranchFilter && selectedBranchFilter !== 'ALL') {
+                    transQuery = transQuery.eq('branch', selectedBranchFilter);
+                }
+
                 const { data: trans } = await transQuery;
 
                 if (trans) {
@@ -332,6 +336,7 @@
                         is_open,
                         latitude,
                         longitude,
+                        branch,
                         users!inner (
                             id,
                             name,
@@ -343,7 +348,7 @@
                     .not('unit_name', 'ilike', '%test%');
 
                 if (selectedBranchFilter && selectedBranchFilter !== 'ALL') {
-                    unitsQuery = unitsQuery.eq('users.branch', selectedBranchFilter);
+                    unitsQuery = unitsQuery.eq('branch', selectedBranchFilter);
                 }
 
                 const { data: units, error } = await unitsQuery;
