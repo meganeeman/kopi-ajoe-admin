@@ -859,15 +859,21 @@
             closeDetailModal();
             stopNotificationSound();
 
-            const tableName = activeTab === 'request' ? 'stock_requests' : 'stock_returns';
-
             try {
                 for (const item of group.items) {
-                    const rejectionResult = await supabaseAdmin
-                        .from(tableName)
-                        .update({ status: 'rejected' })
-                        .eq('id', item.itemId);
-                    ensureSupabaseSuccess(rejectionResult, 'Gagal menolak pengajuan');
+                    if (activeTab === 'request') {
+                        const { data, error } = await supabaseAdmin.rpc('reject_stock_request', {
+                            p_request_id: item.itemId
+                        });
+                        if (error) throw error;
+                        if (!data?.success) throw new Error(data?.message || 'Gagal menolak permintaan stok.');
+                    } else {
+                        const rejectionResult = await supabaseAdmin
+                            .from('stock_returns')
+                            .update({ status: 'rejected' })
+                            .eq('id', item.itemId);
+                        ensureSupabaseSuccess(rejectionResult, 'Gagal menolak pengembalian stok');
+                    }
                 }
 
                 showNotifModal(`Pengajuan dari ${group.salesName} berhasil DITOLAK.`);
