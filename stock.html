@@ -508,7 +508,6 @@
                         products ( name, category, is_bundle ),
                         cart_units (
                             active_sales_id,
-                            branch,
                             users ( name )
                         )
                     `)
@@ -545,7 +544,6 @@
                         products ( name, category, is_bundle ),
                         cart_units (
                             active_sales_id,
-                            branch,
                             users ( name )
                         )
                     `)
@@ -640,7 +638,6 @@
                 if (!globalGroupedData[key]) {
                     globalGroupedData[key] = {
                         cartUnitId: cartUnitId,
-                        branch: item.cart_units?.branch || currentAdminBranch,
                         salesName: salesName,
                         status: item.status,
                         latestTime: item.created_at,
@@ -791,54 +788,11 @@
                     showNotifModal(`Berhasil menyetujui permintaan stok dari ${group.salesName}!`);
                 } else {
                     for (const item of group.items) {
-                        const returnUpdate = await supabaseAdmin
-                            .from('stock_returns')
-                            .update({ status: 'approved' })
-                            .eq('id', item.itemId);
-                        ensureSupabaseSuccess(returnUpdate, 'Gagal menyetujui pengembalian');
-
-                        if (group.cartUnitId && group.cartUnitId !== 'unknown') {
-                            const stockResult = await supabaseAdmin
-                                .from('cart_stocks')
-                                .select('id, quantity')
-                                .eq('cart_unit_id', group.cartUnitId)
-                                .eq('product_id', item.productId)
-                                .maybeSingle();
-                            ensureSupabaseSuccess(stockResult, 'Gagal membaca stok gerobak');
-                            const existingStock = stockResult.data;
-
-                            if (existingStock) {
-                                const remainingQty = Math.max(0, (existingStock.quantity || 0) - parseInt(item.quantity, 10));
-                                const stockUpdate = await supabaseAdmin
-                                    .from('cart_stocks')
-                                    .update({ quantity: remainingQty })
-                                    .eq('id', existingStock.id);
-                                ensureSupabaseSuccess(stockUpdate, 'Gagal mengurangi stok gerobak');
-                            }
-                        }
-
-                        const inventoryResult = await supabaseAdmin
-                            .from('inventory')
-                            .select('id, stock')
-                            .eq('product_id', item.productId)
-                            .eq('branch', group.branch)
-                            .maybeSingle();
-                        ensureSupabaseSuccess(inventoryResult, 'Gagal membaca stok gudang');
-                        const inv = inventoryResult.data;
-
-                        if (inv) {
-                            const newInvTotal = (inv.stock || 0) + parseInt(item.quantity, 10);
-                            const inventoryUpdate = await supabaseAdmin
-                                .from('inventory')
-                                .update({ stock: newInvTotal })
-                                .eq('id', inv.id);
-                            ensureSupabaseSuccess(inventoryUpdate, 'Gagal menambah stok gudang');
-                        } else {
-                            const inventoryInsert = await supabaseAdmin
-                                .from('inventory')
-                                .insert({ product_id: item.productId, branch: group.branch, stock: parseInt(item.quantity, 10) });
-                            ensureSupabaseSuccess(inventoryInsert, 'Gagal membuat stok gudang');
-                        }
+                        const { data, error } = await supabaseAdmin.rpc('approve_stock_return', {
+                            p_return_id: item.itemId
+                        });
+                        if (error) throw error;
+                        if (!data?.success) throw new Error(data?.message || 'Gagal menyetujui pengembalian stok.');
                     }
                     showNotifModal(`Berhasil menyetujui pengembalian stok dari ${group.salesName}!`);
                 }
@@ -868,11 +822,12 @@
                         if (error) throw error;
                         if (!data?.success) throw new Error(data?.message || 'Gagal menolak permintaan stok.');
                     } else {
-                        const rejectionResult = await supabaseAdmin
-                            .from('stock_returns')
-                            .update({ status: 'rejected' })
-                            .eq('id', item.itemId);
-                        ensureSupabaseSuccess(rejectionResult, 'Gagal menolak pengembalian stok');
+                        const { data, error } = await supabaseAdmin.rpc('reject_stock_return', {
+                            p_return_id: item.itemId,
+                            p_reason: null
+                        });
+                        if (error) throw error;
+                        if (!data?.success) throw new Error(data?.message || 'Gagal menolak pengembalian stok.');
                     }
                 }
 
